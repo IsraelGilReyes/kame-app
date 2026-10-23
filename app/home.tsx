@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../src/features/auth/presentation/context/AuthContext'; // Ajusta la ruta a tu AuthContext
 
 // Definición de las secciones/módulos con emojis
 const menuModules = [
@@ -35,12 +36,26 @@ const menuModules = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user, signOut } = useAuth(); // Extraemos user y signOut del contexto
+
+  const handleLogout = async () => {
+    await signOut(); // Borra el token y datos guardados en AsyncStorage
+    router.replace('/login'); // Redirige a la pantalla de login
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Encabezado con información del usuario */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>¡Bienvenido!</Text>
-        <Text style={styles.subtitle}>Panel de Control - Kame House</Text>
+        <View>
+          <Text style={styles.greeting}>¡Bienvenido, {user?.name || 'Usuario'}!</Text>
+          <Text style={styles.subtitle}>Panel de Control - Kame House</Text>
+          {user?.role && (
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleText}>{user.role}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Grid de Tarjetas */}
@@ -59,6 +74,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Botón de Cerrar Sesión */}
+      <TouchableOpacity
+        style={styles.logoutButton}
+        activeOpacity={0.8}
+        onPress={handleLogout}
+      >
+        <Text style={styles.logoutIcon}>🚪</Text>
+        <Text style={styles.logoutText}>Cerrar Sesión</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -69,25 +94,41 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     backgroundColor: '#F8F9FA',
+    justifyContent: 'space-between',
   },
   header: {
     marginBottom: 28,
   },
   greeting: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#2D3748',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#718096',
     marginTop: 4,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  roleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4A5568',
+    textTransform: 'uppercase',
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 16,
+    marginBottom: 30,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -119,5 +160,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2D3748',
     textAlign: 'center',
+  },
+  /* Estilos del Botón de Cerrar Sesión */
+  logoutButton: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FEB2B2',
+    borderRadius: 14,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+    gap: 8,
+  },
+  logoutIcon: {
+    fontSize: 18,
+  },
+  logoutText: {
+    color: '#E53E3E',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

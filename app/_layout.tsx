@@ -1,7 +1,9 @@
+import { AuthProvider } from '@/features/auth/presentation/context/AuthContext';
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
   return (
+    <AuthProvider>
     <Stack screenOptions={{ headerShown: false }}>
       {/* headerShown: false oculta el encabezado por defecto, 
           se puede activar en las pantallas donde se nececite el appbar para volver atrás */}
@@ -13,5 +15,6 @@ export default function RootLayout() {
       <Stack.Screen name="orders" />
       <Stack.Screen name="products" />
     </Stack>
+    </AuthProvider>
   );
 }
