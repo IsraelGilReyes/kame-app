@@ -1,219 +1,109 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, FlatList, StyleSheet, Text, View } from 'react-native';
-
-// Datos de ejemplo simulando la estructura del modelo Product de Prisma
-const pizzaProducts = [
-  { id: 1, name: 'Pizza Pepperoni', price: '180.00' },
-  { id: 2, name: 'Pizza Hawaiana', price: '140.00' },
-  { id: 3, name: 'Pizza Mexicana', price: '220.00' },
-  { id: 4, name: 'Pizza de Queso', price: '100.00' },
-];
-
-// Tipos basados en tu esquema de Prisma (Enum Role y modelo User)
-type Role = 'GERENTE' | 'CAJERO' | 'REPARTIDOR';
-
-interface UserSession {
-  id: number;
-  name: string;
-  email: string;
-  role: Role;
-  branchId: number | null;
-  branchName?: string;
-}
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { colors } from '../../../shared/theme/colors';
+import { useAuth } from '../../auth/presentation/context/AuthContext';
+import { Product } from '../domain/entities';
+import { getProducts } from '../infrastructure/datasources/products-api.datasource';
 
 export function ProductsView() {
-  const router = useRouter();
-
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<UserSession | null>(null);
+  const router = useRouter();
+  const { user } = useAuth();
 
-  useEffect(() => {
-    // Simulando la carga del usuario autenticado conectado al backend
-    const getSessionData = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+  const isGerente = user?.role === 'GERENTE';
 
-      // Simulamos un usuario con el rol GERENTE perteneciente a la sucursal 1
-      const simulatedUser: UserSession = {
-        id: 1,
-        name: 'Israel',
-        email: 'israel@pizzeria.com',
-        role: 'GERENTE', // Prueba cambiando a 'CAJERO' o 'REPARTIDOR'
-        branchId: 1,
-        branchName: 'Sucursal Centro',
-      };
-
-      setUser(simulatedUser);
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await getProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Error al cargar productos:', error);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    getSessionData();
-  }, []);
-
-  // Según tu esquema, solo el GERENTE debe tener privilegios para modificar/gestionar productos
-  const canManageProducts = user?.role === 'GERENTE';
-
-  // Renderizado de las filas de la tabla
-  const renderItem = ({ item, index }: { item: typeof pizzaProducts[0]; index: number }) => (
-    <View style={[styles.row, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
-      <Text style={[styles.cell, styles.nameCell]}>{item.name}</Text>
-      <Text style={[styles.cell, styles.priceCell]}>${item.price}</Text>
-    </View>
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts();
+    }, [])
   );
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={{ marginTop: 10 }}>Cargando datos de sesión...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      {/* Encabezado con datos del rol y sucursal de Prisma */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.title}>Catálogo de Productos</Text>
-        {user && (
-          <Text style={styles.sessionText}>
-            📍 {user.branchName || 'Sin Sucursal'} | Rol: <Text style={styles.roleTag}>{user.role}</Text>
-          </Text>
-        )}
+      <View style={styles.header}>
+        <Text style={styles.title}>Catálogo de Productos 🍕</Text>
       </View>
 
-      {/* Botón exclusivo para GERENTE (Gestión en su sucursal) */}
-      {canManageProducts && (
-        <View style={styles.adminBanner}>
-          <Text style={styles.adminText}>Panel de Administración ({user?.branchName})</Text>
-          <Button
-            title="⚙️ Gestionar Productos de Sucursal"
-            color="#1A535C"
-            onPress={() =>
-              router.push({
-                pathname: 'products/manageProducts' as any,
-               
-              })
-            }
-          />
-        </View>
+      {isGerente && (
+        <TouchableOpacity
+          style={styles.manageButton}
+          onPress={() => router.push('/products/manageProducts' as any)}
+        >
+          <Text style={styles.manageButtonText}>⚙️ Administrar Productos</Text>
+        </TouchableOpacity>
       )}
 
-      {/* Tabla de Productos (Basada en modelo Product de Prisma: name y price) */}
-      <View style={styles.table}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.headerCell, styles.nameCell]}>Nombre del Producto</Text>
-          <Text style={[styles.headerCell, styles.priceCell]}>Precio</Text>
-        </View>
-
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+      ) : (
         <FlatList
-          data={pizzaProducts}
+          data={products}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardInfo}>
+                <Text style={styles.productName}>{item.name}</Text>
+                <Text style={styles.productPrice}>
+                  ${Number(item.price).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          )}
         />
-      </View>
-
-      
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: '#fff',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerContainer: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#2D3748',
-  },
-  sessionText: {
-    fontSize: 13,
-    color: '#718096',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  roleTag: {
-    fontWeight: 'bold',
-    color: '#FF6B6B',
-  },
-  adminBanner: {
-    backgroundColor: '#E6FFFA',
-    borderWidth: 1,
-    borderColor: '#319795',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  adminText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#234E52',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  table: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f4f4f4',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  headerCell: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    color: '#333',
-  },
-  listContainer: {
-    flexGrow: 0,
-  },
-  row: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  evenRow: {
-    backgroundColor: '#ffffff',
-  },
-  oddRow: {
-    backgroundColor: '#fafafa',
-  },
-  cell: {
-    fontSize: 14,
-    color: '#555',
-  },
-  nameCell: {
-    flex: 2,
-  },
-  priceCell: {
-    flex: 1,
-    textAlign: 'right',
-  },
-  buttonContainer: {
-    marginTop: 'auto',
+  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 50 },
+  header: { marginBottom: 20, alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
+  manageButton: {
+    backgroundColor: colors.secondary,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     marginBottom: 20,
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
+  manageButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  card: {
+    backgroundColor: colors.surface,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 1,
+  },
+  cardInfo: { flex: 1 },
+  productName: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+  productPrice: { fontSize: 16, fontWeight: '700', color: colors.accent, marginTop: 4 },
 });

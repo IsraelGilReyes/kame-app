@@ -1,4 +1,3 @@
-
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -17,7 +16,7 @@ import { useAuth } from './context/AuthContext';
 
 export function LoginView() {
   const router = useRouter();
-  const { signIn } = useAuth(); // <-- Extraemos la función global de login
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,9 +57,6 @@ export function LoginView() {
       setLoading(false);
     }
   }
-
-
-
 
   return (
     <KeyboardAvoidingView
@@ -168,7 +164,7 @@ export function LoginView() {
 const styles = StyleSheet.create({
   keyboard: {
     flex: 1,
-    backgroundColor: colors.sand,
+    backgroundColor: colors.background,
   },
   scroll: {
     flexGrow: 1,
@@ -179,7 +175,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 22,
     paddingVertical: 32,
-    backgroundColor: colors.sand,
+    backgroundColor: colors.background,
   },
   brandRow: {
     flexDirection: 'row',
@@ -191,45 +187,49 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 17,
-    backgroundColor: colors.burgundyDark,
+    backgroundColor: colors.primary,
     borderWidth: 1,
-    borderColor: colors.ochre,
+    borderColor: colors.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
-    color: colors.ochre,
+    color: colors.gold,
     fontSize: 31,
     fontWeight: '900',
   },
   brand: {
-    color: colors.burgundyDark,
+    color: colors.primary,
     fontSize: 21,
     fontWeight: '900',
     letterSpacing: 1,
   },
   subtitle: {
-    color: colors.wine,
+    color: colors.secondary,
     fontSize: 13,
     marginTop: 3,
   },
   card: {
-    backgroundColor: colors.cream,
+    backgroundColor: colors.surface,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: colors.white,
+    borderColor: colors.border,
     padding: 24,
     elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
   accent: {
     width: 42,
     height: 5,
     borderRadius: 10,
-    backgroundColor: colors.brick,
+    backgroundColor: colors.accent,
     marginBottom: 17,
   },
   title: {
-    color: colors.burgundyDark,
+    color: colors.primary,
     fontSize: 28,
     fontWeight: '900',
   },
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   label: {
-    color: colors.burgundyDark,
+    color: colors.primary,
     fontWeight: '700',
     fontSize: 13,
     marginBottom: 8,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 13,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   icon: {
     width: 27,
-    color: colors.wine,
+    color: colors.secondary,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -271,13 +271,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   showPassword: {
-    color: colors.wine,
+    color: colors.secondary,
     fontSize: 11,
     fontWeight: '700',
     paddingLeft: 5,
   },
   error: {
-    color: colors.error,
+    color: colors.danger,
     fontSize: 13,
     marginBottom: 14,
     lineHeight: 18,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     textAlign: 'center',
-    color: colors.wine,
+    color: colors.secondary,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1,
