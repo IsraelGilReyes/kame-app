@@ -1,367 +1,220 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Button,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { colors } from '../../../shared/theme/colors';
+import { useAuth } from '../../auth/presentation/context/AuthContext';
+import { Order, OrderStatus } from '../domain/entities';
+import { getOrders, updateOrderStatus } from '../infrastructure/datasources/orders-api.datasource';
 
-// Tipos basados en tu esquema de Prisma
-type Role = 'GERENTE' | 'CAJERO';
-type OrderStatus = 'PENDIENTE' | 'PREPARACION' | 'ENVIADO' | 'ENTREGADO' | 'CANCELADO';
-
-interface OrderItemModel {
-  productId: number;
-  productName: string;
-  quantity: number;
-  price: string;
-}
-
-interface OrderModel {
-  id: number;
-  userId: number;
-  branchId: number;
-  total: string;
-  status: OrderStatus;
-  items: OrderItemModel[];
-  createdAt: string;
-}
-
-interface UserSession {
-  id: number;
-  name: string;
-  role: Role;
-  branchId: number;
-  branchName: string;
-}
-
-// Productos disponibles de ejemplo para armar la orden
-const availableProducts = [
-  { id: 1, name: 'Pizza Pepperoni', price: '180.00' },
-  { id: 2, name: 'Pizza Hawaiana', price: '140.00' },
-  { id: 3, name: 'Pizza Mexicana', price: '220.00' },
-  { id: 4, name: 'Pizza de Queso', price: '100.00' },
-];
-
-export  function OrdersView() {
-  const router = useRouter();
-
+export function OrdersView() {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<UserSession | null>(null);
+  const router = useRouter();
+  const { user } = useAuth();
 
-  // Lista simulada de órdenes con sus respectivos productos (OrderItem)
-  const [orders, setOrders] = useState<OrderModel[]>([
-    {
-      id: 1,
-      userId: 1,
-      branchId: 1,
-      total: '320.00',
-      status: 'PENDIENTE',
-      items: [
-        { productId: 1, productName: 'Pizza Pepperoni', quantity: 1, price: '180.00' },
-        { productId: 2, productName: 'Pizza Hawaiana', quantity: 1, price: '140.00' },
-      ],
-      createdAt: '2026-10-14 10:00',
-    },
-    {
-      id: 2,
-      userId: 1,
-      branchId: 1,
-      total: '220.00',
-      status: 'ENTREGADO',
-      items: [
-        { productId: 3, productName: 'Pizza Mexicana', quantity: 1, price: '220.00' },
-      ],
-      createdAt: '2026-10-14 10:15',
-    },
-  ]);
-
-  // Estados para el Modal (Crear / Editar Orden)
+  // Estados para el Modal de Detalles
   const [modalVisible, setModalVisible] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentId, setCurrentId] = useState<number | null>(null);
-  const [status, setStatus] = useState<OrderStatus>('PENDIENTE');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  // Verificación de roles según tu backend
+  const userRole = user?.role || '';
+  const canCreateOrder = ['GERENTE', 'CAJERO'].includes(userRole);
+  const canUpdateStatus = ['GERENTE', 'CAJERO', 'REPARTIDOR', 'COCINA'].includes(userRole);
   
-  // Productos seleccionados temporalmente para la orden actual
-  const [selectedItems, setSelectedItems] = useState<OrderItemModel[]>([]);
+  // 🔒 Restricción para ver las órdenes entregadas del día (Solo Gerente y Cajero)
+  const canViewDailyDelivered = ['GERENTE', 'CAJERO'].includes(userRole);
 
-  useEffect(() => {
-    const getSessionData = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const simulatedUser: UserSession = {
-        id: 1,
-        name: 'Carlos Cajero',
-        role: 'CAJERO',
-        branchId: 1,
-        branchName: 'Sucursal Centro',
-      };
-      setUser(simulatedUser);
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await getOrders();
+      setOrders(data);
+    } catch (error) {
+      console.error('Error al cargar órdenes:', error);
+    } finally {
       setLoading(false);
-    };
-    getSessionData();
-  }, []);
-
-  const canManageOrders = user?.role === 'GERENTE' || user?.role === 'CAJERO';
-
-  // Agregar producto a la orden en curso (en el modal)
-  const handleAddProductToOrder = (prod: typeof availableProducts[0]) => {
-    const existing = selectedItems.find((item) => item.productId === prod.id);
-    if (existing) {
-      setSelectedItems(
-        selectedItems.map((item) =>
-          item.productId === prod.id ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      );
-    } else {
-      setSelectedItems([
-        ...selectedItems,
-        { productId: prod.id, productName: prod.name, quantity: 1, price: prod.price },
-      ]);
     }
   };
 
-  // Remover producto de la orden en curso
-  const handleRemoveProductFromOrder = (productId: number) => {
-    setSelectedItems(selectedItems.filter((item) => item.productId !== productId));
-  };
-
-  // Calcular total automáticamente basado en los items
-  const calculateTotal = () => {
-    return selectedItems
-      .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0)
-      .toFixed(2);
-  };
-
-  // Abrir modal para CREAR orden
-  const handleOpenCreate = () => {
-    setIsEditing(false);
-    setCurrentId(null);
-    setStatus('PENDIENTE');
-    setSelectedItems([]);
-    setModalVisible(true);
-  };
-
-  // Abrir modal para EDITAR orden
-  const handleOpenEdit = (order: OrderModel) => {
-    setIsEditing(true);
-    setCurrentId(order.id);
-    setStatus(order.status);
-    setSelectedItems([...order.items]);
-    setModalVisible(true);
-  };
-
-  // Guardar Orden (Crear o Modificar)
-  const handleSaveOrder = () => {
-    if (selectedItems.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos un producto a la orden');
-      return;
-    }
-
-    const totalCalculated = calculateTotal();
-
-    if (isEditing && currentId !== null) {
-      setOrders(
-        orders.map((o) =>
-          o.id === currentId
-            ? { ...o, total: totalCalculated, status, items: selectedItems }
-            : o
-        )
-      );
-      Alert.alert('Éxito', 'Orden modificada correctamente');
-    } else {
-      const newOrder: OrderModel = {
-        id: Date.now(),
-        userId: user?.id || 1,
-        branchId: user?.branchId || 1,
-        total: totalCalculated,
-        status: 'PENDIENTE',
-        items: selectedItems,
-        createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      };
-      setOrders([newOrder, ...orders]);
-      Alert.alert('Éxito', 'Orden creada exitosamente');
-    }
-
-    setModalVisible(false);
-  };
-
-  // Eliminar orden
-  const handleDeleteOrder = (id: number) => {
-    Alert.alert(
-      'Confirmar eliminación',
-      '¿Estás seguro de que deseas eliminar esta orden?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            setOrders(orders.filter((o) => o.id !== id));
-            Alert.alert('Eliminado', 'La orden ha sido removida.');
-          },
-        },
-      ]
-    );
-  };
-
-  // Renderizar cada orden en la lista principal
-  const renderItem = ({ item }: { item: OrderModel }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.orderId}>Orden #{item.id}</Text>
-        <Text style={styles.statusText}>{item.status}</Text>
-      </View>
-
-      {/* Lista de productos incluidos en la orden */}
-      <View style={styles.itemsContainer}>
-        <Text style={styles.itemsTitle}>Productos:</Text>
-        {item.items.map((prod, idx) => (
-          <View key={idx} style={styles.itemRow}>
-            <Text style={styles.itemText}>• {prod.quantity}x {prod.productName}</Text>
-            <Text style={styles.itemPrice}>${(parseFloat(prod.price) * prod.quantity).toFixed(2)}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.cardFooter}>
-        <Text style={styles.orderTotal}>Total: ${item.total}</Text>
-        <Text style={styles.orderDate}>{item.createdAt}</Text>
-      </View>
-
-      {canManageOrders && (
-        <View style={styles.cardActions}>
-          <TouchableOpacity style={styles.editButton} onPress={() => handleOpenEdit(item)}>
-            <Text style={styles.actionText}>✏️ Editar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteOrder(item.id)}>
-            <Text style={styles.actionText}>🗑️ Eliminar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders();
+    }, [])
   );
 
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#4ECDC4" />
-        <Text style={{ marginTop: 10 }}>Cargando módulo de órdenes...</Text>
-      </View>
-    );
-  }
+  const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+      case 'PENDIENTE': return colors.warning;
+      case 'PREPARACION': return colors.accent;
+      case 'ENVIADO': return '#805AD5';
+      case 'ENTREGADO': return colors.success;
+      case 'CANCELADO': return colors.danger;
+      default: return colors.muted;
+    }
+  };
+
+  // Manejar el cambio de estado de una orden
+  const handleStatusChange = async (newStatus: string) => {
+    if (!selectedOrder) return;
+    try {
+      setUpdating(true);
+      await updateOrderStatus(selectedOrder.id, { status: newStatus });
+      Alert.alert('Éxito', `Orden #${selectedOrder.id} actualizada a ${newStatus}`);
+      setModalVisible(false);
+      loadOrders();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo actualizar el estado');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
+      {/* Encabezado sin botón de volver */}
       <View style={styles.header}>
-        <Text style={styles.title}>Gestión de Órdenes</Text>
-        <Text style={styles.subtitle}>📍 {user?.branchName} | Rol: {user?.role}</Text>
+        <Text style={styles.title}>Órdenes y Pedidos 📋</Text>
       </View>
 
-      {/* Botones de Acción Superior */}
-      {canManageOrders && (
-        <View style={styles.topActionsContainer}>
-          <View style={{ flex: 1, marginRight: 6 }}>
-            <Button title="+ Crear Orden" color="#319795" onPress={handleOpenCreate} />
-          </View>
-          <View style={{ flex: 1, marginLeft: 6 }}>
-            <Button 
-              title="📅 Entregadas Hoy" 
-              color="#2B6CB0" 
-              onPress={() => router.push('orders/DailyDeliveredOrders' as any)} 
-            />
-          </View>
-        </View>
+      {/* Botón exclusivo para crear orden según el rol */}
+      {canCreateOrder && (
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => router.push('/orders/CreateOrder' as any)}
+        >
+          <Text style={styles.createButtonText}>+ Crear Nueva Orden</Text>
+        </TouchableOpacity>
       )}
 
-      <FlatList
-        data={orders}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-      />
+      {/* 🚀 Botón exclusivo para GERENTE y CAJERO para ver las órdenes entregadas del día */}
+      {canViewDailyDelivered && (
+        <TouchableOpacity
+          style={styles.dailyButton}
+          onPress={() => router.push('/orders/DailyDeliveredOrders' as any)} // Ajusta la ruta exacta de tu archivo
+        >
+          <Text style={styles.dailyButtonText}>📅 Ver Órdenes Entregadas Hoy</Text>
+        </TouchableOpacity>
+      )}
 
-      
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedOrder(item);
+                setModalVisible(true);
+              }}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.orderId}>Orden #{item.id}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
+              </View>
 
-      {/* Modal para Crear / Editar Orden con Productos */}
+              {item.branch && <Text style={styles.detail}>Sucursal: {item.branch.name}</Text>}
+              {item.user && <Text style={styles.detail}>Atendió: {item.user.name}</Text>}
+              
+              <Text style={styles.total}>Total: ${Number(item.total).toFixed(2)}</Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
+
+      {/* Modal de Detalles y Cambio de Estado */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? 'Modificar Orden' : 'Nueva Orden'}
-            </Text>
-
-            <ScrollView style={{ maxHeight: 300 }}>
-              {/* Selector de productos disponibles */}
-              <Text style={styles.label}>Seleccionar Productos:</Text>
-              <View style={styles.productsCatalog}>
-                {availableProducts.map((p) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={styles.catalogItem}
-                    onPress={() => handleAddProductToOrder(p)}
-                  >
-                    <Text style={styles.catalogItemText}>+ {p.name} (${p.price})</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Productos agregados a la orden actual */}
-              <Text style={[styles.label, { marginTop: 12 }]}>Productos en la Orden:</Text>
-              {selectedItems.length === 0 ? (
-                <Text style={styles.emptyText}>No hay productos agregados aún.</Text>
-              ) : (
-                selectedItems.map((item) => (
-                  <View key={item.productId} style={styles.selectedItemRow}>
-                    <Text style={styles.selectedItemText}>
-                      {item.quantity}x {item.productName}
+            {selectedOrder && (
+              <>
+                <Text style={styles.modalTitle}>Detalles de Orden #{selectedOrder.id}</Text>
+                
+                <View style={styles.modalInfoBox}>
+                  <Text style={styles.modalTextInfo}>
+                    <Text style={{ fontWeight: 'bold' }}>Estado actual:</Text>{' '}
+                    <Text style={{ color: getStatusColor(selectedOrder.status), fontWeight: 'bold' }}>
+                      {selectedOrder.status}
                     </Text>
-                    <TouchableOpacity onPress={() => handleRemoveProductFromOrder(item.productId)}>
-                      <Text style={styles.removeText}>❌ Quitar</Text>
-                    </TouchableOpacity>
+                  </Text>
+                  {selectedOrder.branch && (
+                    <Text style={styles.modalTextInfo}>
+                      <Text style={{ fontWeight: 'bold' }}>Sucursal:</Text> {selectedOrder.branch.name}
+                    </Text>
+                  )}
+                  {selectedOrder.user && (
+                    <Text style={styles.modalTextInfo}>
+                      <Text style={{ fontWeight: 'bold' }}>Atendió:</Text> {selectedOrder.user.name}
+                    </Text>
+                  )}
+                </View>
+
+                <Text style={styles.productsHeader}>Productos en la orden:</Text>
+                <FlatList
+                  data={selectedOrder.items || []}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item }) => (
+                    <View style={styles.productRow}>
+                      <Text style={styles.productName}>
+                        {item.product?.name || 'Producto'} (x{item.quantity})
+                      </Text>
+                      <Text style={styles.productPrice}>
+                        ${(Number(item.product?.price || 0) * item.quantity).toFixed(2)}
+                      </Text>
+                    </View>
+                  )}
+                  style={styles.productList}
+                />
+
+                <Text style={styles.modalTotal}>
+                  Total: ${Number(selectedOrder.total).toFixed(2)}
+                </Text>
+
+                {/* Botones de cambio de estado si el rol está permitido */}
+                {canUpdateStatus && (
+                  <View style={styles.statusActionContainer}>
+                    <Text style={styles.changeStatusLabel}>Cambiar estado a:</Text>
+                    <View style={styles.statusButtonsGrid}>
+                      {['PENDIENTE', 'PREPARACION', 'ENVIADO', 'ENTREGADO', 'CANCELADO'].map((st) => (
+                        selectedOrder.status !== st && (
+                          <TouchableOpacity
+                            key={st}
+                            style={[styles.statusOptionBtn, { backgroundColor: getStatusColor(st as OrderStatus) }]}
+                            onPress={() => handleStatusChange(st)}
+                            disabled={updating}
+                          >
+                            <Text style={styles.statusOptionText}>{st}</Text>
+                          </TouchableOpacity>
+                        )
+                      ))}
+                    </View>
                   </View>
-                ))
-              )}
+                )}
 
-              {/* Estado de la orden (Solo si está editando) */}
-              {isEditing && (
-                <>
-                  <Text style={[styles.label, { marginTop: 12 }]}>Estado de la Orden:</Text>
-                  <View style={styles.statusContainer}>
-                    {(['PENDIENTE', 'PREPARACION', 'ENVIADO', 'ENTREGADO', 'CANCELADO'] as OrderStatus[]).map((st) => (
-                      <TouchableOpacity
-                        key={st}
-                        style={[styles.statusChip, status === st && styles.statusChipSelected]}
-                        onPress={() => setStatus(st)}
-                      >
-                        <Text style={[styles.statusChipText, status === st && styles.statusChipTextSelected]}>
-                          {st}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalTotalContainer}>
-              <Text style={styles.modalTotalText}>Total a Pagar: ${calculateTotal()}</Text>
-            </View>
-
-            <View style={styles.modalButtons}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Button title="Cancelar" color="#E53E3E" onPress={() => setModalVisible(false)} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Button title={isEditing ? 'Guardar Cambios' : 'Crear Orden'} color="#319795" onPress={handleSaveOrder} />
-              </View>
-            </View>
+                <TouchableOpacity
+                  style={styles.closeModalBtn}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.closeModalText}>Cerrar</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -370,251 +223,65 @@ export  function OrdersView() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    paddingTop: 50,
-    backgroundColor: '#F8F9FA',
-  },
-  centerContent: {
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 50 },
+  header: { marginBottom: 20, alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
+  createButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-  },
-  header: {
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2D3748',
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#718096',
-    marginTop: 2,
-  },
-  topActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDF2F7',
-    paddingBottom: 6,
-  },
-  orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2D3748',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#D69E2E',
-    backgroundColor: '#FEFCBF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  itemsContainer: {
-    marginBottom: 8,
-  },
-  itemsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4A5568',
-    marginBottom: 4,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-  },
-  itemText: {
-    fontSize: 13,
-    color: '#2D3748',
-  },
-  itemPrice: {
-    fontSize: 13,
-    color: '#718096',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#EDF2F7',
-    paddingTop: 6,
-    marginBottom: 8,
-  },
-  orderTotal: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2B6CB0',
-  },
-  orderDate: {
-    fontSize: 11,
-    color: '#A0AEC0',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: '#EDF2F7',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  deleteButton: {
-    backgroundColor: '#FED7D7',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  backButtonContainer: {
-    marginTop: 'auto',
     marginBottom: 10,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
+  createButtonText: { color: colors.surface, fontSize: 16, fontWeight: 'bold' },
+  dailyButton: {
+    backgroundColor: colors.secondary,
+    paddingVertical: 12,
     borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    alignItems: 'center',
     marginBottom: 16,
-    textAlign: 'center',
-    color: '#2D3748',
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4A5568',
-    marginBottom: 6,
-  },
-  productsCatalog: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  catalogItem: {
-    backgroundColor: '#EBF8FF',
     borderWidth: 1,
-    borderColor: '#BEE3F8',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderColor: colors.border,
   },
-  catalogItemText: {
-    fontSize: 12,
-    color: '#2B6CB0',
-    fontWeight: '500',
-  },
-  selectedItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F7FAFC',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  selectedItemText: {
-    fontSize: 13,
-    color: '#2D3748',
-  },
-  removeText: {
-    fontSize: 12,
-    color: '#E53E3E',
-  },
-  emptyText: {
-    fontSize: 12,
-    color: '#A0AEC0',
-    fontStyle: 'italic',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  statusChip: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  dailyButtonText: { color: colors.surface, fontSize: 15, fontWeight: 'bold' },
+  listContainer: { paddingBottom: 20 },
+  card: {
+    backgroundColor: colors.surface,
+    padding: 16,
     borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#CBD5E0',
-    backgroundColor: '#EDF2F7',
+    borderColor: colors.border,
+    elevation: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
-  statusChipSelected: {
-    backgroundColor: '#319795',
-    borderColor: '#319795',
-  },
-  statusChipText: {
-    fontSize: 11,
-    color: '#4A5568',
-  },
-  statusChipTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  modalTotalContainer: {
-    marginVertical: 12,
-    alignItems: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#EDF2F7',
-    paddingTop: 8,
-  },
-  modalTotalText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2B6CB0',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  orderId: { fontSize: 16, fontWeight: 'bold', color: colors.text },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { color: colors.surface, fontSize: 11, fontWeight: 'bold' },
+  detail: { fontSize: 14, color: colors.muted, marginTop: 2 },
+  total: { fontSize: 16, fontWeight: 'bold', color: colors.accent, marginTop: 8 },
+  
+  // Estilos del Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(43, 33, 30, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%', maxWidth: 450, maxHeight: '80%', borderWidth: 1, borderColor: colors.border, elevation: 5 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center', color: colors.primary },
+  modalInfoBox: { backgroundColor: colors.background, padding: 10, borderRadius: 8, marginBottom: 12 },
+  modalTextInfo: { fontSize: 14, color: colors.text, marginBottom: 4 },
+  productsHeader: { fontSize: 14, fontWeight: 'bold', color: colors.primary, marginBottom: 6 },
+  productList: { maxHeight: 150, marginBottom: 10 },
+  productRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
+  productName: { fontSize: 13, color: colors.text },
+  productPrice: { fontSize: 13, fontWeight: '600', color: colors.accent },
+  modalTotal: { fontSize: 16, fontWeight: 'bold', color: colors.primary, textAlign: 'right', marginVertical: 10 },
+  statusActionContainer: { marginTop: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  changeStatusLabel: { fontSize: 13, fontWeight: 'bold', color: colors.muted, marginBottom: 8 },
+  statusButtonsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 15 },
+  statusOptionBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  statusOptionText: { color: colors.surface, fontSize: 11, fontWeight: 'bold' },
+  closeModalBtn: { backgroundColor: colors.muted, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  closeModalText: { color: colors.surface, fontWeight: 'bold', fontSize: 14 },
 });

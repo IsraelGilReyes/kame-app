@@ -12,6 +12,10 @@ export default function ProductsLayout() {
         name="DailyDeliveredOrders" 
         options={{ title: 'Daily Delivered Orders' }} // Esto activa automáticamente el appbar con el título y botón de volver
       />
+      <Stack.Screen 
+        name="CreateOrder" 
+        options={{ title: 'Create Order' }} // Esto activa automáticamente el appbar con el título y botón de volver
+      />
       
     </Stack>
   );

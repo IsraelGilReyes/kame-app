@@ -1,46 +1,47 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../src/features/auth/presentation/context/AuthContext'; // Ajusta la ruta a tu AuthContext
+import { useAuth } from '../src/features/auth/presentation/context/AuthContext';
+import { colors } from '../src/shared/theme/colors'; // Ajusta la ruta de importación de tu archivo colors.tsx
 
-// Definición de las secciones/módulos con emojis
+// Definición de las secciones/módulos utilizando la paleta corporativa
 const menuModules = [
   {
     id: 'products',
     title: 'Productos',
     icon: '🍕',
     route: '/products',
-    color: '#FF6B6B',
+    color: colors.accent, // B43526
   },
   {
     id: 'orders',
     title: 'Órdenes',
     icon: '📋',
     route: '/orders',
-    color: '#4ECDC4',
+    color: colors.success, // #287A50
   },
   {
     id: 'cashier',
     title: 'Caja',
     icon: '💵',
     route: '/cash-register',
-    color: '#FFE66D',
+    color: colors.gold, // #E5A659
   },
   {
     id: 'branches',
     title: 'Sucursal',
     icon: '🏠',
     route: '/branches',
-    color: '#1A535C',
+    color: colors.primary, // #4F0E08
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth(); // Extraemos user y signOut del contexto
+  const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
-    await signOut(); // Borra el token y datos guardados en AsyncStorage
-    router.replace('/login'); // Redirige a la pantalla de login
+    await signOut();
+    router.replace('/login');
   };
 
   return (
@@ -49,7 +50,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>¡Bienvenido, {user?.name || 'Usuario'}!</Text>
-          <Text style={styles.subtitle}>Panel de Control - Kame House</Text>
+          <Text style={styles.subtitle}>Panel de Control</Text>
           {user?.role && (
             <View style={styles.roleBadge}>
               <Text style={styles.roleText}>{user.role}</Text>
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background, // #FFF9F2
     justifyContent: 'space-between',
   },
   header: {
@@ -102,16 +103,16 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: colors.primary, // #4F0E08
   },
   subtitle: {
     fontSize: 15,
-    color: '#718096',
+    color: colors.muted, // #806F68
     marginTop: 4,
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.beige, // #DFBC94
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#4A5568',
+    color: colors.primary, // #4F0E08
     textTransform: 'uppercase',
   },
   gridContainer: {
@@ -131,17 +132,19 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface, // #FFFFFF
     width: '47%',
     aspectRatio: 1,
     borderRadius: 16,
     padding: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: colors.border, // #E9D8CB
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
   iconContainer: {
@@ -158,15 +161,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3748',
+    color: colors.text, // #2B211E
     textAlign: 'center',
   },
   /* Estilos del Botón de Cerrar Sesión */
   logoutButton: {
     flexDirection: 'row',
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1,
-    borderColor: '#FEB2B2',
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.danger, // #B42318
     borderRadius: 14,
     paddingVertical: 14,
     justifyContent: 'center',
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   logoutText: {
-    color: '#E53E3E',
+    color: colors.danger, // #B42318
     fontSize: 16,
     fontWeight: '700',
   },
