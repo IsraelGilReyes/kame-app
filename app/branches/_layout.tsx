@@ -9,6 +9,10 @@ export default function ProductsLayout() {
         name="index" 
         options={{ title: 'Branch' }} // Esto activa automáticamente el appbar con el título y botón de volver
       />
+      <Stack.Screen 
+        name="manageBranches" 
+        options={{ title: 'Manage Branches' }} // Esto activa automáticamente el appbar con el título y botón de volver
+      />
       
     </Stack>
   );

@@ -3,10 +3,16 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { loginUser } from '../../infrastructure/datasources/auth-api.datasource';
 
 interface User {
-  id: number; // Coincide con tu backend (número)
+  id: number;
   name: string;
   email: string;
   role: string;
+  branchId?: number; // 👈 Agregado para soportar la sucursal del usuario
+  branch?: {         // 👈 Opcional, por si el backend también manda el objeto branch completo
+    id: number;
+    name: string;
+    address: string;
+  };
 }
 
 interface AuthContextData {
@@ -49,7 +55,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, pass: string) => {
     const response = await loginUser({ email, password: pass });
 
-    // Corrección: Usamos access_token en lugar de token
     await AsyncStorage.setItem('@kame_token', response.access_token);
     await AsyncStorage.setItem('@kame_user', JSON.stringify(response.user));
 
