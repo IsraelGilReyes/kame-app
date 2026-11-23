@@ -1,3 +1,5 @@
+//src\features\branches\infrastructure\datasources\branches-api.datasource.ts
+
 import { apiUrl } from '@/shared/config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -59,11 +61,12 @@ export const createBranch = async (data: BranchPayload): Promise<Branch> => {
   }
 };
 
+
 // Actualizar una sucursal existente
 export const updateBranch = async (id: number, data: BranchPayload): Promise<Branch> => {
   try {
     const headers = await getAuthHeaders();
-    const response = await axios.put<Branch>(
+    const response = await axios.patch<Branch>(
       apiUrl(`/branches/${id}`),
       {
         name: data.name.trim(),

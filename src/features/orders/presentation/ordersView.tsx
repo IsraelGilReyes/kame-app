@@ -1,15 +1,16 @@
 // src/features/orders/presentation/ordersView.tsx
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
-  StyleSheet,
+  Pressable,
+  RefreshControl,
+  ScrollView,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
@@ -19,6 +20,9 @@ import {
   getOrders,
   updateOrderStatus,
 } from '../infrastructure/datasources/orders-api.datasource';
+import { styles } from './ordersView.styles';
+
+type StatusFilter = 'TODAS' | OrderStatus;
 
 const ALL_STATUSES: OrderStatus[] = [
   'PENDIENTE',
@@ -28,9 +32,13 @@ const ALL_STATUSES: OrderStatus[] = [
   'CANCELADO',
 ];
 
+const STATUS_FILTERS: StatusFilter[] = ['TODAS', ...ALL_STATUSES];
+
 export function OrdersView() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [selectedFilter, setSelectedFilter] = useState<StatusFilter>('TODAS');
   const router = useRouter();
   const { user } = useAuth();
 
@@ -58,23 +66,41 @@ export function OrdersView() {
 
   const allowedStatuses = getAllowedStatusesForRole();
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const data = await getOrders();
       setOrders(data);
     } catch (error) {
       console.error('Error al cargar órdenes:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadOrders();
-    }, []),
+      loadOrders(false);
+    }, [loadOrders]),
   );
+
+  const countByStatus = useMemo(() => {
+    const counts: Record<string, number> = { TODAS: orders.length };
+    for (const status of ALL_STATUSES) {
+      counts[status] = orders.filter((o) => o.status === status).length;
+    }
+    return counts;
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    if (selectedFilter === 'TODAS') return orders;
+    return orders.filter((order) => order.status === selectedFilter);
+  }, [orders, selectedFilter]);
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
@@ -83,7 +109,7 @@ export function OrdersView() {
       case 'PREPARACION':
         return colors.accent;
       case 'ENVIADO':
-        return '#805AD5';
+        return colors.secondary;
       case 'ENTREGADO':
         return colors.success;
       case 'CANCELADO':
@@ -94,7 +120,7 @@ export function OrdersView() {
   };
 
   const getOrderTypeLabel = (order: Order) =>
-    order.type === 'DOMICILIO' ? '🛵 A Domicilio' : '🏪 En Local';
+    order.type === 'DOMICILIO' ? 'A Domicilio' : 'En Local';
 
   // Manejar el cambio de estado de una orden
   const handleStatusChange = async (newStatus: OrderStatus) => {
@@ -104,7 +130,7 @@ export function OrdersView() {
       await updateOrderStatus(selectedOrder.id, { status: newStatus });
       Alert.alert('Éxito', `Orden #${selectedOrder.id} actualizada a ${newStatus}`);
       setModalVisible(false);
-      loadOrders();
+      loadOrders(false);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo actualizar el estado');
     } finally {
@@ -114,336 +140,323 @@ export function OrdersView() {
 
   return (
     <View style={styles.container}>
-      {/* Encabezado sin botón de volver */}
+      {/* Barra superior */}
+      <View style={styles.topBar}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>PEDIDOS Y FLUJO</Text>
+        </View>
+      </View>
+
+      {/* Encabezado */}
       <View style={styles.header}>
-        <Text style={styles.title}>Órdenes y Pedidos 📋</Text>
+        <Text style={styles.title}>Órdenes y Pedidos</Text>
+        <Text style={styles.subtitle}>
+          Consulta el estado de las órdenes y actualiza su avance
+        </Text>
       </View>
 
       {/* Botón exclusivo para crear orden según el rol */}
       {canCreateOrder && (
-        <TouchableOpacity
-          style={styles.createButton}
+        <Pressable
           onPress={() => router.push('/orders/CreateOrder' as any)}
+          style={({ pressed }) => [
+            styles.createButton,
+            pressed && styles.createButtonPressed,
+          ]}
         >
-          <Text style={styles.createButtonText}>+ Crear Nueva Orden</Text>
-        </TouchableOpacity>
+          <View style={styles.createIconBox}>
+            <Text style={styles.createIconText}>+</Text>
+          </View>
+          <Text style={styles.createButtonText}>Crear Nueva Orden</Text>
+        </Pressable>
       )}
 
       {/* Botón para ver las órdenes entregadas del día */}
       {canViewDailyDelivered && (
-        <TouchableOpacity
-          style={styles.dailyButton}
+        <Pressable
           onPress={() => router.push('/orders/DailyDeliveredOrders' as any)}
+          style={({ pressed }) => [
+            styles.dailyButton,
+            pressed && styles.dailyButtonPressed,
+          ]}
         >
-          <Text style={styles.dailyButtonText}>📅 Ver Órdenes Entregadas Hoy</Text>
-        </TouchableOpacity>
+          <Text style={styles.dailyButtonText}>Ver Órdenes Entregadas Hoy</Text>
+          <Text style={styles.dailyArrow}>→</Text>
+        </Pressable>
       )}
 
+      {/* Chips de filtro rápido por estado */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersScroll}
+        contentContainerStyle={styles.filtersContainer}
+      >
+        {STATUS_FILTERS.map((filter) => {
+          const isActive = selectedFilter === filter;
+          const count = countByStatus[filter] ?? 0;
+
+          return (
+            <Pressable
+              key={filter}
+              onPress={() => setSelectedFilter(filter)}
+              style={[
+                styles.filterChip,
+                isActive && styles.filterChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  isActive && styles.filterChipTextActive,
+                ]}
+              >
+                {filter}
+              </Text>
+              <View
+                style={[
+                  styles.filterCountBadge,
+                  isActive && styles.filterCountBadgeActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterCountText,
+                    isActive && styles.filterCountTextActive,
+                  ]}
+                >
+                  {count}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       {loading ? (
-        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color={colors.accent}
+          style={{ marginTop: 40 }}
+        />
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadOrders(true)}
+              colors={[colors.accent]}
+              tintColor={colors.accent}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>
+                {selectedFilter === 'TODAS'
+                  ? 'No hay órdenes registradas.'
+                  : `No hay órdenes en estado ${selectedFilter}.`}
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.7}
+            <Pressable
               onPress={() => {
                 setSelectedOrder(item);
                 setModalVisible(true);
               }}
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.cardPressed,
+              ]}
             >
-              <View style={styles.cardHeader}>
-                <Text style={styles.orderId}>Orden #{item.id}</Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(item.status) },
-                  ]}
-                >
-                  <Text style={styles.statusText}>{item.status}</Text>
+              <View
+                style={[
+                  styles.cardTopBar,
+                  { backgroundColor: getStatusColor(item.status) },
+                ]}
+              />
+
+              <View style={styles.cardBody}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.orderId}>Orden #{item.id}</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: getStatusColor(item.status) },
+                    ]}
+                  >
+                    <Text style={styles.statusText}>{item.status}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.typePill}>
+                  <Text style={styles.typeTag}>{getOrderTypeLabel(item)}</Text>
+                </View>
+
+                {item.customerName ? (
+                  <Text style={styles.detail}>Cliente: {item.customerName}</Text>
+                ) : null}
+                {item.type === 'DOMICILIO' && item.address ? (
+                  <Text style={styles.detail} numberOfLines={1}>
+                    Dirección: {item.address}
+                  </Text>
+                ) : null}
+                {item.branch && (
+                  <Text style={styles.detail}>Sucursal: {item.branch.name}</Text>
+                )}
+                {item.user && (
+                  <Text style={styles.detail}>Atendió: {item.user.name}</Text>
+                )}
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.totalLabel}>Total de la orden</Text>
+                  <Text style={styles.total}>
+                    ${Number(item.total).toFixed(2)}
+                  </Text>
                 </View>
               </View>
-
-              <Text style={styles.typeTag}>{getOrderTypeLabel(item)}</Text>
-
-              {item.customerName ? (
-                <Text style={styles.detail}>Cliente: {item.customerName}</Text>
-              ) : null}
-              {item.type === 'DOMICILIO' && item.address ? (
-                <Text style={styles.detail} numberOfLines={1}>
-                  Dirección: {item.address}
-                </Text>
-              ) : null}
-              {item.branch && (
-                <Text style={styles.detail}>Sucursal: {item.branch.name}</Text>
-              )}
-              {item.user && (
-                <Text style={styles.detail}>Atendió: {item.user.name}</Text>
-              )}
-
-              <Text style={styles.total}>Total: ${Number(item.total).toFixed(2)}</Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
           contentContainerStyle={styles.listContainer}
         />
       )}
 
       {/* Modal de Detalles y Cambio de Estado */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedOrder && (
-              <>
-                <Text style={styles.modalTitle}>
-                  Detalles de Orden #{selectedOrder.id}
-                </Text>
+      <Modal visible={modalVisible} animationType="fade" transparent={true}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => !updating && setModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalTopBar} />
 
-                <View style={styles.modalInfoBox}>
-                  <Text style={styles.modalTextInfo}>
-                    <Text style={{ fontWeight: 'bold' }}>Tipo:</Text>{' '}
-                    {getOrderTypeLabel(selectedOrder)}
+            <View style={styles.modalBody}>
+              {selectedOrder && (
+                <>
+                  <Text style={styles.modalTitle}>
+                    Detalles de Orden #{selectedOrder.id}
                   </Text>
-                  <Text style={styles.modalTextInfo}>
-                    <Text style={{ fontWeight: 'bold' }}>Estado actual:</Text>{' '}
-                    <Text
-                      style={{
-                        color: getStatusColor(selectedOrder.status),
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {selectedOrder.status}
-                    </Text>
-                  </Text>
-                  {selectedOrder.customerName ? (
-                    <Text style={styles.modalTextInfo}>
-                      <Text style={{ fontWeight: 'bold' }}>Cliente:</Text>{' '}
-                      {selectedOrder.customerName}
-                    </Text>
-                  ) : null}
-                  {selectedOrder.type === 'DOMICILIO' && selectedOrder.address ? (
-                    <Text style={styles.modalTextInfo}>
-                      <Text style={{ fontWeight: 'bold' }}>Dirección:</Text>{' '}
-                      {selectedOrder.address}
-                    </Text>
-                  ) : null}
-                  {selectedOrder.branch && (
-                    <Text style={styles.modalTextInfo}>
-                      <Text style={{ fontWeight: 'bold' }}>Sucursal:</Text>{' '}
-                      {selectedOrder.branch.name}
-                    </Text>
-                  )}
-                  {selectedOrder.user && (
-                    <Text style={styles.modalTextInfo}>
-                      <Text style={{ fontWeight: 'bold' }}>Atendió:</Text>{' '}
-                      {selectedOrder.user.name}
-                    </Text>
-                  )}
-                </View>
 
-                <Text style={styles.productsHeader}>Productos en la orden:</Text>
-                <FlatList
-                  data={selectedOrder.items || []}
-                  keyExtractor={(item, index) => (item.id ?? index).toString()}
-                  renderItem={({ item }) => (
-                    <View style={styles.productRow}>
-                      <Text style={styles.productName}>
-                        {item.product?.name || 'Producto'} (x{item.quantity})
+                  <View style={styles.modalInfoBox}>
+                    <Text style={styles.modalTextInfo}>
+                      <Text style={{ fontWeight: '800' }}>Tipo:</Text>{' '}
+                      {getOrderTypeLabel(selectedOrder)}
+                    </Text>
+                    <Text style={styles.modalTextInfo}>
+                      <Text style={{ fontWeight: '800' }}>Estado actual:</Text>{' '}
+                      <Text
+                        style={{
+                          color: getStatusColor(selectedOrder.status),
+                          fontWeight: '900',
+                        }}
+                      >
+                        {selectedOrder.status}
                       </Text>
-                      <Text style={styles.productPrice}>
-                        $
-                        {(Number(item.product?.price || 0) * item.quantity).toFixed(2)}
+                    </Text>
+                    {selectedOrder.customerName ? (
+                      <Text style={styles.modalTextInfo}>
+                        <Text style={{ fontWeight: '800' }}>Cliente:</Text>{' '}
+                        {selectedOrder.customerName}
                       </Text>
-                    </View>
-                  )}
-                  style={styles.productList}
-                />
-
-                <Text style={styles.modalTotal}>
-                  Total: ${Number(selectedOrder.total).toFixed(2)}
-                </Text>
-
-                {/* Botones de cambio de estado permitidos para el rol */}
-                {allowedStatuses.length > 0 && (
-                  <View style={styles.statusActionContainer}>
-                    <Text style={styles.changeStatusLabel}>Cambiar estado a:</Text>
-                    <View style={styles.statusButtonsGrid}>
-                      {allowedStatuses.map(
-                        (st) =>
-                          selectedOrder.status !== st && (
-                            <TouchableOpacity
-                              key={st}
-                              style={[
-                                styles.statusOptionBtn,
-                                { backgroundColor: getStatusColor(st) },
-                              ]}
-                              onPress={() => handleStatusChange(st)}
-                              disabled={updating}
-                            >
-                              <Text style={styles.statusOptionText}>{st}</Text>
-                            </TouchableOpacity>
-                          ),
-                      )}
-                    </View>
+                    ) : null}
+                    {selectedOrder.type === 'DOMICILIO' && selectedOrder.address ? (
+                      <Text style={styles.modalTextInfo}>
+                        <Text style={{ fontWeight: '800' }}>Dirección:</Text>{' '}
+                        {selectedOrder.address}
+                      </Text>
+                    ) : null}
+                    {selectedOrder.branch && (
+                      <Text style={styles.modalTextInfo}>
+                        <Text style={{ fontWeight: '800' }}>Sucursal:</Text>{' '}
+                        {selectedOrder.branch.name}
+                      </Text>
+                    )}
+                    {selectedOrder.user && (
+                      <Text style={styles.modalTextInfo}>
+                        <Text style={{ fontWeight: '800' }}>Atendió:</Text>{' '}
+                        {selectedOrder.user.name}
+                      </Text>
+                    )}
                   </View>
-                )}
 
-                <TouchableOpacity
-                  style={styles.closeModalBtn}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={styles.closeModalText}>Cerrar</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
+                  <Text style={styles.productsHeader}>Productos en la orden</Text>
+                  <FlatList
+                    data={selectedOrder.items || []}
+                    keyExtractor={(item, index) => (item.id ?? index).toString()}
+                    showsVerticalScrollIndicator={false}
+                    renderItem={({ item }) => (
+                      <View style={styles.productRow}>
+                        <Text style={styles.productName}>
+                          {item.product?.name || 'Producto'} (x{item.quantity})
+                        </Text>
+                        <Text style={styles.productPrice}>
+                          $
+                          {(
+                            Number(item.product?.price || 0) * item.quantity
+                          ).toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
+                    style={styles.productList}
+                  />
+
+                  <View style={styles.modalTotalBox}>
+                    <Text style={styles.modalTotalLabel}>Total:</Text>
+                    <Text style={styles.modalTotal}>
+                      ${Number(selectedOrder.total).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  {/* Botones de cambio de estado permitidos para el rol */}
+                  {allowedStatuses.length > 0 && (
+                    <View style={styles.statusActionContainer}>
+                      <Text style={styles.changeStatusLabel}>
+                        Cambiar estado a:
+                      </Text>
+                      <View style={styles.statusButtonsGrid}>
+                        {allowedStatuses.map(
+                          (st) =>
+                            selectedOrder.status !== st && (
+                              <Pressable
+                                key={st}
+                                onPress={() => handleStatusChange(st)}
+                                disabled={updating}
+                                style={({ pressed }) => [
+                                  styles.statusOptionBtn,
+                                  { backgroundColor: getStatusColor(st) },
+                                  pressed && styles.statusOptionBtnPressed,
+                                ]}
+                              >
+                                <Text style={styles.statusOptionText}>{st}</Text>
+                              </Pressable>
+                            ),
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  <Pressable
+                    onPress={() => setModalVisible(false)}
+                    disabled={updating}
+                    style={({ pressed }) => [
+                      styles.closeModalBtn,
+                      pressed && styles.closeModalBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.closeModalText}>Cerrar</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: 20,
-    paddingTop: 50,
-  },
-  header: { marginBottom: 20, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
-  createButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  createButtonText: { color: colors.surface, fontSize: 16, fontWeight: 'bold' },
-  dailyButton: {
-    backgroundColor: colors.secondary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  dailyButtonText: { color: colors.surface, fontSize: 15, fontWeight: 'bold' },
-  listContainer: { paddingBottom: 20 },
-  card: {
-    backgroundColor: colors.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 2,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  orderId: { fontSize: 16, fontWeight: 'bold', color: colors.text },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  statusText: { color: colors.surface, fontSize: 11, fontWeight: 'bold' },
-  typeTag: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.accent,
-    marginBottom: 4,
-  },
-  detail: { fontSize: 14, color: colors.muted, marginTop: 2 },
-  total: { fontSize: 16, fontWeight: 'bold', color: colors.accent, marginTop: 8 },
-
-  // Estilos del Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(43, 33, 30, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 450,
-    maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-    color: colors.primary,
-  },
-  modalInfoBox: {
-    backgroundColor: colors.background,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  modalTextInfo: { fontSize: 14, color: colors.text, marginBottom: 4 },
-  productsHeader: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 6,
-  },
-  productList: { maxHeight: 150, marginBottom: 10 },
-  productRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  productName: { fontSize: 13, color: colors.text },
-  productPrice: { fontSize: 13, fontWeight: '600', color: colors.accent },
-  modalTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
-    textAlign: 'right',
-    marginVertical: 10,
-  },
-  statusActionContainer: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 10,
-  },
-  changeStatusLabel: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: colors.muted,
-    marginBottom: 8,
-  },
-  statusButtonsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 15,
-  },
-  statusOptionBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
-  statusOptionText: { color: colors.surface, fontSize: 11, fontWeight: 'bold' },
-  closeModalBtn: {
-    backgroundColor: colors.muted,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  closeModalText: { color: colors.surface, fontWeight: 'bold', fontSize: 14 },
-});

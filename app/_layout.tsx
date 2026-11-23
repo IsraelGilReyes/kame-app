@@ -9,6 +9,7 @@ export default function RootLayout() {
           se puede activar en las pantallas donde se nececite el appbar para volver atrás */}
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="changePassword" />
       <Stack.Screen name="home" />
       <Stack.Screen name="branches" />
       <Stack.Screen name="cash-register" />

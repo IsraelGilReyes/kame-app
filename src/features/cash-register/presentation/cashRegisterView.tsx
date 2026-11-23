@@ -3,11 +3,10 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
@@ -18,6 +17,7 @@ import {
   getActiveCashRegister,
   openCashRegister,
 } from '../infrastructure/datasources/cash-register-api.datasource';
+import { styles } from './cashRegisterView.styles';
 
 export function CashRegisterView() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export function CashRegisterView() {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [currentRegister, setCurrentRegister] = useState<CashRegister | null>(null);
   const [initialAmountInput, setInitialAmountInput] = useState<string>('');
+  const [inputFocused, setInputFocused] = useState<boolean>(false);
 
   // Mensajes de retroalimentación en UI
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -122,508 +123,271 @@ export function CashRegisterView() {
   });
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Barra superior */}
+      <View style={[styles.topBar, { justifyContent: 'flex-end' }]}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>CONTROL DE CAJA</Text>
+        </View>
+      </View>
+
       {/* Encabezado */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtnWrapper}>
-          <Text style={styles.backButton}>← Volver</Text>
-        </TouchableOpacity>
         <Text style={styles.title}>Módulo de Caja</Text>
-        <Text style={styles.branchText}>📍 {branchName}</Text>
-        <Text style={styles.dateText}>📅 {todayDate}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.branchText}>{branchName}</Text>
+          <Text style={styles.dateText}>{todayDate}</Text>
+        </View>
       </View>
 
       {/* Botón condicional: visible para GERENTE y ADMIN_GENERAL */}
       {canViewWeeklyHistory && (
-        <TouchableOpacity
-          style={styles.weeklyHistoryBtn}
+        <Pressable
           onPress={() => router.push('/cash-register/weeklyCashRegisters' as any)}
+          style={({ pressed }) => [
+            styles.weeklyHistoryBtn,
+            pressed && styles.weeklyHistoryBtnPressed,
+          ]}
         >
-          <Text style={styles.weeklyHistoryBtnText}>📊 Ver Historial Semanal de Cajas</Text>
-        </TouchableOpacity>
+          <View style={styles.weeklyHistoryLeft}>
+            <View style={styles.weeklyBadge}>
+              <Text style={styles.weeklyBadgeText}>HISTORIAL</Text>
+            </View>
+            <Text style={styles.weeklyHistoryBtnText}>
+              Historial Semanal de Cajas
+            </Text>
+          </View>
+          <Text style={styles.weeklyArrow}>→</Text>
+        </Pressable>
       )}
 
       {/* Banners de Notificación */}
-      {errorMsg ? <Text style={styles.errorBanner}>{errorMsg}</Text> : null}
-      {successMsg ? <Text style={styles.successBanner}>{successMsg}</Text> : null}
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{errorMsg}</Text>
+        </View>
+      ) : null}
+
+      {successMsg ? (
+        <View style={styles.successBanner}>
+          <Text style={styles.successBannerText}>{successMsg}</Text>
+        </View>
+      ) : null}
 
       {/* PANEL DE CAJA ABIERTA */}
       {currentRegister && currentRegister.status === 'OPEN' ? (
-        <View style={styles.activeCard}>
-          <View style={styles.statusBadgeOpen}>
-            <Text style={styles.statusTextOpen}>🟢 CAJA ABIERTA</Text>
-          </View>
+        <View style={styles.card}>
+          <View style={styles.cardTopBarOpen} />
 
-          <Text style={styles.infoLabel}>Caja ID: #{currentRegister.id}</Text>
-          <Text style={styles.infoSubText}>
-            Aperturada el:{' '}
-            {new Date(currentRegister.openedAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
+          <View style={styles.cardBody}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusBadgeOpen}>
+                <View style={styles.statusDotOpen} />
+                <Text style={styles.statusTextOpen}>CAJA ABIERTA</Text>
+              </View>
 
-          <View style={styles.metricsContainer}>
-            <View style={styles.metricBox}>
-              <Text style={styles.metricTitle}>Fondo Inicial</Text>
-              <Text style={styles.metricValue}>
-                ${Number(currentRegister.initialAmount).toFixed(2)}
-              </Text>
+              <View style={styles.registerIdPill}>
+                <Text style={styles.registerIdText}>ID #{currentRegister.id}</Text>
+              </View>
             </View>
 
-            <View style={styles.metricBox}>
-              <Text style={styles.metricTitle}>Recaudado Hoy</Text>
-              <Text style={[styles.metricValue, { color: colors.success }]}>
-                +${Number(currentRegister.generatedAmount || 0).toFixed(2)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>Total Esperado en Caja:</Text>
-            <Text style={styles.totalValue}>
-              ${Number(currentRegister.totalAmount).toFixed(2)}
+            <Text style={styles.infoLabel}>Turno activo</Text>
+            <Text style={styles.infoSubText}>
+              Aperturada a las{' '}
+              {new Date(currentRegister.openedAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </Text>
-          </View>
 
-          <TouchableOpacity
-            style={[styles.closeBtn, actionLoading && { opacity: 0.7 }]}
-            onPress={() => {
-              setErrorMsg('');
-              setSuccessMsg('');
-              setConfirmModalVisible(true);
-            }}
-            disabled={actionLoading}
-          >
-            <Text style={styles.closeBtnText}>🔒 Cerrar Caja del Día</Text>
-          </TouchableOpacity>
+            <View style={styles.metricsContainer}>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricTitle}>Fondo Inicial</Text>
+                <Text style={styles.metricValue}>
+                  ${Number(currentRegister.initialAmount).toFixed(2)}
+                </Text>
+              </View>
+
+              <View style={styles.metricBox}>
+                <Text style={styles.metricTitle}>Recaudado Hoy</Text>
+                <Text style={[styles.metricValue, { color: colors.success }]}>
+                  +${Number(currentRegister.generatedAmount || 0).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.totalBox}>
+              <Text style={styles.totalLabel}>Total Esperado en Caja</Text>
+              <Text style={styles.totalValue}>
+                ${Number(currentRegister.totalAmount).toFixed(2)}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => {
+                setErrorMsg('');
+                setSuccessMsg('');
+                setConfirmModalVisible(true);
+              }}
+              disabled={actionLoading}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                pressed && styles.closeBtnPressed,
+                actionLoading && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={styles.closeBtnText}>Cerrar Caja del Día</Text>
+            </Pressable>
+          </View>
         </View>
       ) : (
         /* PANEL DE APERTURA DE CAJA */
-        <View style={styles.inactiveCard}>
-          <View style={styles.statusBadgeClosed}>
-            <Text style={styles.statusTextClosed}>🔴 CAJA CERRADA / SIN APERTURAR</Text>
+        <View style={styles.card}>
+          <View style={styles.cardTopBarClosed} />
+
+          <View style={styles.cardBody}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusBadgeClosed}>
+                <View style={styles.statusDotClosed} />
+                <Text style={styles.statusTextClosed}>CAJA CERRADA</Text>
+              </View>
+            </View>
+
+            <Text style={styles.openFormTitle}>Apertura de Caja para la Sucursal</Text>
+            <Text style={styles.openFormSubtitle}>
+              Ingresa el fondo inicial disponible para comenzar a operar el día.
+            </Text>
+
+            <Text style={styles.label}>Cantidad Inicial (Fondo de caja)</Text>
+
+            <TextInput
+              style={[
+                styles.input,
+                inputFocused && styles.inputFocused,
+              ]}
+              placeholder="Ej. 500.00"
+              placeholderTextColor={colors.muted}
+              keyboardType="numeric"
+              value={initialAmountInput}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              onChangeText={(text) => {
+                setInitialAmountInput(text);
+                if (errorMsg) setErrorMsg('');
+              }}
+            />
+
+            <Pressable
+              onPress={handleOpenRegister}
+              disabled={actionLoading}
+              style={({ pressed }) => [
+                styles.openBtn,
+                pressed && styles.openBtnPressed,
+                actionLoading && { opacity: 0.7 },
+              ]}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.openBtnText}>Aperturar Caja Ahora</Text>
+              )}
+            </Pressable>
           </View>
-
-          <Text style={styles.openFormTitle}>Apertura de Caja para la Sucursal</Text>
-          <Text style={styles.label}>Ingresa la Cantidad Inicial (Fondo de caja):</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Ej. 500.00"
-            placeholderTextColor={colors.muted}
-            keyboardType="numeric"
-            value={initialAmountInput}
-            onChangeText={(text) => {
-              setInitialAmountInput(text);
-              if (errorMsg) setErrorMsg('');
-            }}
-          />
-
-          <TouchableOpacity
-            style={[styles.openBtn, actionLoading && { opacity: 0.7 }]}
-            onPress={handleOpenRegister}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <Text style={styles.openBtnText}>🔓 Aperturar Caja Ahora</Text>
-            )}
-          </TouchableOpacity>
         </View>
       )}
 
       {/* MODAL DE CONFIRMACIÓN DE CIERRE DE CAJA */}
       <Modal visible={confirmModalVisible} animationType="fade" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirmar Cierre de Caja</Text>
-            <Text style={styles.modalSubtitle}>
-              ¿Deseas cerrar la caja actual? Se calculará el total recaudado por órdenes entregadas.
-            </Text>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => !actionLoading && setConfirmModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalTopBar} />
 
-            {currentRegister && (
-              <View style={styles.modalSummaryBox}>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalRowLabel}>Monto Inicial:</Text>
-                  <Text style={styles.modalRowValue}>
-                    ${Number(currentRegister.initialAmount).toFixed(2)}
-                  </Text>
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalRowLabel}>Recaudado Hoy:</Text>
-                  <Text style={[styles.modalRowValue, { color: colors.success }]}>
-                    +${Number(currentRegister.generatedAmount || 0).toFixed(2)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.modalRow,
-                    {
-                      borderTopWidth: 1,
-                      borderTopColor: colors.border,
-                      marginTop: 8,
-                      paddingTop: 8,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.modalRowLabel, { fontWeight: 'bold' }]}>
-                    Total Final:
-                  </Text>
-                  <Text
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>Confirmar Cierre de Caja</Text>
+              <Text style={styles.modalSubtitle}>
+                ¿Deseas cerrar la caja actual? Se calculará el total recaudado por órdenes entregadas.
+              </Text>
+
+              {currentRegister && (
+                <View style={styles.modalSummaryBox}>
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalRowLabel}>Monto Inicial:</Text>
+                    <Text style={styles.modalRowValue}>
+                      ${Number(currentRegister.initialAmount).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalRowLabel}>Recaudado Hoy:</Text>
+                    <Text style={[styles.modalRowValue, { color: colors.success }]}>
+                      +${Number(currentRegister.generatedAmount || 0).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View
                     style={[
-                      styles.modalRowValue,
-                      { fontWeight: 'bold', color: colors.accent },
+                      styles.modalRow,
+                      {
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
+                        marginTop: 8,
+                        paddingTop: 8,
+                      },
                     ]}
                   >
-                    ${Number(currentRegister.totalAmount).toFixed(2)}
-                  </Text>
+                    <Text style={[styles.modalRowLabel, { fontWeight: '800', color: colors.text }]}>
+                      Total Final:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.modalRowValue,
+                        { fontWeight: '900', color: colors.secondary },
+                      ]}
+                    >
+                      ${Number(currentRegister.totalAmount).toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
+              )}
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setConfirmModalVisible(false)}
+                  disabled={actionLoading}
+                  style={({ pressed }) => [
+                    styles.modalCancelBtn,
+                    pressed && styles.modalCancelBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={confirmCloseRegister}
+                  disabled={actionLoading}
+                  style={[
+                    styles.modalConfirmBtn,
+                    actionLoading && { opacity: 0.7 },
+                  ]}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color={colors.surface} size="small" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>Sí, Cerrar Caja</Text>
+                  )}
+                </Pressable>
               </View>
-            )}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setConfirmModalVisible(false)}
-                disabled={actionLoading}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalConfirmBtn, actionLoading && { opacity: 0.7 }]}
-                onPress={confirmCloseRegister}
-                disabled={actionLoading}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator color={colors.surface} size="small" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>Sí, Cerrar Caja</Text>
-                )}
-              </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 16,
-    paddingTop: 45,
-    backgroundColor: colors.background,
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: colors.muted,
-    fontSize: 14,
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  backBtnWrapper: {
-    position: 'absolute',
-    left: 0,
-    top: 2,
-  },
-  backButton: {
-    fontSize: 15,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  branchText: {
-    fontSize: 14,
-    color: colors.secondary,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  dateText: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  weeklyHistoryBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  weeklyHistoryBtnText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    color: colors.danger,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  successBanner: {
-    backgroundColor: '#D1FAE5',
-    color: colors.success,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  activeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: 20,
-  },
-  inactiveCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: 20,
-  },
-  statusBadgeOpen: {
-    backgroundColor: '#D1FAE5',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  statusTextOpen: {
-    color: colors.success,
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  statusBadgeClosed: {
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  statusTextClosed: {
-    color: colors.danger,
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  infoLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  infoSubText: {
-    fontSize: 12,
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 10,
-  },
-  metricBox: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  metricTitle: {
-    fontSize: 12,
-    color: colors.muted,
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  totalBox: {
-    backgroundColor: colors.beige,
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  totalLabel: {
-    fontSize: 13,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.accent,
-    marginTop: 2,
-  },
-  closeBtn: {
-    backgroundColor: colors.danger,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  closeBtnText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  openFormTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.muted,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: colors.background,
-    color: colors.text,
-  },
-  openBtn: {
-    backgroundColor: colors.success,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  openBtnText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(43, 33, 30, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: colors.muted,
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  modalSummaryBox: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  modalRowLabel: {
-    fontSize: 13,
-    color: colors.muted,
-  },
-  modalRowValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    backgroundColor: colors.border,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: colors.text,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalConfirmBtn: {
-    flex: 1,
-    backgroundColor: colors.danger,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});

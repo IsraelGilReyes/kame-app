@@ -1,0 +1,337 @@
+import { StyleSheet } from 'react-native';
+
+import { colors } from '../../../shared/theme/colors';
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+    paddingTop: 54,
+    paddingBottom: 16,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+  },
+  badge: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.beige,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  badgeText: {
+    color: colors.secondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  header: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: colors.primary,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 4,
+    lineHeight: 19,
+  },
+  errorBanner: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.danger,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  errorBannerText: {
+    color: colors.danger,
+    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  // Estilos de Pestañas (Tabs)
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    gap: 6,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  activeTabButton: {
+    backgroundColor: colors.primary,
+    elevation: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 4,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  activeTabText: {
+    color: colors.surface,
+    fontWeight: '800',
+  },
+
+  sectionContainer: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 10,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: colors.muted,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+
+  // Selector LOCAL / DOMICILIO
+  typeSelectorRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTypeButton: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  typeButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  activeTypeText: {
+    color: colors.surface,
+    fontWeight: '800',
+  },
+
+  productCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: 14,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  productCardPressed: {
+    borderColor: colors.beige,
+    backgroundColor: colors.surface,
+  },
+  productName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  productPrice: {
+    fontSize: 14,
+    color: colors.accent,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  addIconBadge: {
+    backgroundColor: colors.primary,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addIconText: {
+    color: colors.surface,
+    fontWeight: '900',
+    fontSize: 18,
+    lineHeight: 20,
+  },
+
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 7,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    marginBottom: 15,
+    backgroundColor: colors.background,
+    color: colors.text,
+  },
+  inputFocused: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+  },
+  multilineInput: {
+    minHeight: 72,
+    textAlignVertical: 'top',
+  },
+
+  orderItemList: {
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: colors.background,
+    minHeight: 120,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.muted,
+    marginTop: 28,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+    paddingHorizontal: 14,
+  },
+
+  orderItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  summaryName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  summarySub: {
+    fontSize: 12,
+    color: colors.muted,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  qtyBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.beige,
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qtyBtnPressed: {
+    backgroundColor: colors.beige,
+  },
+  qtyBtnText: {
+    fontWeight: '900',
+    color: colors.primary,
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  qtyText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: colors.text,
+    minWidth: 22,
+    textAlign: 'center',
+  },
+
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.beige,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  totalAmount: {
+    fontSize: 21,
+    fontWeight: '900',
+    color: colors.secondary,
+  },
+
+  submitButton: {
+    backgroundColor: colors.success,
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonPressed: {
+    opacity: 0.88,
+  },
+  submitButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+});

@@ -1,0 +1,140 @@
+import { StyleSheet } from 'react-native';
+
+import { colors } from '../../../shared/theme/colors';
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+    paddingTop: 54,
+    paddingBottom: 16,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+  },
+  badge: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.beige,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  badgeText: {
+    color: colors.secondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  header: {
+    marginBottom: 18,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: colors.primary,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 4,
+    lineHeight: 19,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    marginBottom: 18,
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+  },
+  manageButtonPressed: {
+    backgroundColor: colors.secondary,
+  },
+  manageButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  manageArrow: {
+    color: colors.gold,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  listContainer: {
+    paddingBottom: 24,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  cardTopBar: {
+    height: 5,
+    backgroundColor: colors.accent,
+  },
+  cardBody: {
+    padding: 16,
+  },
+  cardInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  productName: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: colors.primary,
+    flex: 1,
+  },
+  pricePill: {
+    backgroundColor: colors.beige,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  productPrice: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: colors.secondary,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

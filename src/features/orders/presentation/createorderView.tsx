@@ -5,11 +5,10 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
@@ -20,6 +19,7 @@ import {
   createOrder,
   CreateOrderPayload,
 } from '../infrastructure/datasources/orders-api.datasource';
+import { styles } from './createorderView.styles';
 
 interface SelectedItem {
   productId: number;
@@ -27,6 +27,8 @@ interface SelectedItem {
   price: number;
   quantity: number;
 }
+
+type FocusedInput = 'branchId' | 'customerName' | 'address' | null;
 
 export function CreateOrderView() {
   const router = useRouter();
@@ -46,6 +48,7 @@ export function CreateOrderView() {
   const [customerName, setCustomerName] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [focusedInput, setFocusedInput] = useState<FocusedInput>(null);
 
   // Cargar el catálogo de productos disponibles
   const loadProducts = async () => {
@@ -181,86 +184,137 @@ export function CreateOrderView() {
 
   return (
     <View style={styles.container}>
-      {/* Encabezado */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Nueva Orden 🍕</Text>
+      {/* Barra superior */}
+      <View style={styles.topBar}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>PEDIDOS</Text>
+        </View>
       </View>
 
-      {errorMsg ? <Text style={styles.errorBanner}>{errorMsg}</Text> : null}
+      {/* Encabezado */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Nueva Orden</Text>
+        <Text style={styles.subtitle}>
+          Selecciona productos del catálogo y configura el tipo de entrega
+        </Text>
+      </View>
+
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{errorMsg}</Text>
+        </View>
+      ) : null}
 
       {/* Selector de Pestañas para Móvil (Tabs) */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'catalog' && styles.activeTabButton]}
+        <Pressable
           onPress={() => setActiveTab('catalog')}
+          style={[
+            styles.tabButton,
+            activeTab === 'catalog' && styles.activeTabButton,
+          ]}
         >
-          <Text style={[styles.tabText, activeTab === 'catalog' && styles.activeTabText]}>
-            🍕 Catálogo de Productos
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'catalog' && styles.activeTabText,
+            ]}
+          >
+            Catálogo
           </Text>
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'summary' && styles.activeTabButton]}
+        <Pressable
           onPress={() => setActiveTab('summary')}
+          style={[
+            styles.tabButton,
+            activeTab === 'summary' && styles.activeTabButton,
+          ]}
         >
-          <Text style={[styles.tabText, activeTab === 'summary' && styles.activeTabText]}>
-            🛒 Pedido ({getTotalItemsCount()})
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'summary' && styles.activeTabText,
+            ]}
+          >
+            Pedido ({getTotalItemsCount()})
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Contenido condicional según la pestaña seleccionada en el teléfono */}
       {activeTab === 'catalog' ? (
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHint}>Toca un producto para agregarlo al pedido:</Text>
+          <Text style={styles.sectionHint}>
+            Toca un producto para agregarlo al pedido:
+          </Text>
           {loading ? (
-            <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+            <ActivityIndicator
+              size="large"
+              color={colors.accent}
+              style={{ marginTop: 40 }}
+            />
           ) : (
             <FlatList
               data={products}
               keyExtractor={(item) => item.id.toString()}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.productCard}
+                <Pressable
                   onPress={() => handleAddProduct(item)}
-                  activeOpacity={0.7}
+                  style={({ pressed }) => [
+                    styles.productCard,
+                    pressed && styles.productCardPressed,
+                  ]}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
+                    <Text style={styles.productPrice}>
+                      ${Number(item.price).toFixed(2)}
+                    </Text>
                   </View>
                   <View style={styles.addIconBadge}>
                     <Text style={styles.addIconText}>+</Text>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               )}
               contentContainerStyle={{ paddingBottom: 20 }}
             />
           )}
         </View>
       ) : (
-        <ScrollView style={styles.sectionContainer} contentContainerStyle={{ paddingBottom: 30 }}>
+        <ScrollView
+          style={styles.sectionContainer}
+          contentContainerStyle={{ paddingBottom: 30 }}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.sectionTitle}>Tipo de Pedido y Sucursal</Text>
 
           {/* Selector LOCAL / DOMICILIO */}
           <View style={styles.typeSelectorRow}>
-            <TouchableOpacity
-              style={[styles.typeButton, orderType === 'LOCAL' && styles.activeTypeButton]}
+            <Pressable
               onPress={() => handleSelectOrderType('LOCAL')}
+              style={[
+                styles.typeButton,
+                orderType === 'LOCAL' && styles.activeTypeButton,
+              ]}
             >
               <Text
-                style={[styles.typeButtonText, orderType === 'LOCAL' && styles.activeTypeText]}
+                style={[
+                  styles.typeButtonText,
+                  orderType === 'LOCAL' && styles.activeTypeText,
+                ]}
               >
-                🏪 En Local
+                En Local
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
+              onPress={() => handleSelectOrderType('DOMICILIO')}
               style={[
                 styles.typeButton,
                 orderType === 'DOMICILIO' && styles.activeTypeButton,
               ]}
-              onPress={() => handleSelectOrderType('DOMICILIO')}
             >
               <Text
                 style={[
@@ -268,16 +322,21 @@ export function CreateOrderView() {
                   orderType === 'DOMICILIO' && styles.activeTypeText,
                 ]}
               >
-                🛵 A Domicilio
+                A Domicilio
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           <Text style={styles.label}>ID de Sucursal</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              focusedInput === 'branchId' && styles.inputFocused,
+            ]}
             value={branchId}
             onChangeText={setBranchId}
+            onFocus={() => setFocusedInput('branchId')}
+            onBlur={() => setFocusedInput(null)}
             keyboardType="numeric"
           />
 
@@ -286,37 +345,57 @@ export function CreateOrderView() {
             <>
               <Text style={styles.label}>Nombre del Cliente *</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  focusedInput === 'customerName' && styles.inputFocused,
+                ]}
                 placeholder="Ej. Juan Pérez"
                 placeholderTextColor={colors.muted}
                 value={customerName}
                 onChangeText={setCustomerName}
+                onFocus={() => setFocusedInput('customerName')}
+                onBlur={() => setFocusedInput(null)}
               />
 
               <Text style={styles.label}>Dirección de Entrega *</Text>
               <TextInput
-                style={[styles.input, styles.multilineInput]}
+                style={[
+                  styles.input,
+                  styles.multilineInput,
+                  focusedInput === 'address' && styles.inputFocused,
+                ]}
                 placeholder="Calle, número, colonia y referencias"
                 placeholderTextColor={colors.muted}
                 value={address}
                 onChangeText={setAddress}
+                onFocus={() => setFocusedInput('address')}
+                onBlur={() => setFocusedInput(null)}
                 multiline
               />
             </>
           ) : (
             <>
-              <Text style={styles.label}>Nombre o Referencia (Opcional en local)</Text>
+              <Text style={styles.label}>
+                Nombre o Referencia (Opcional en local)
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  focusedInput === 'customerName' && styles.inputFocused,
+                ]}
                 placeholder="Ej. Mesa 4 o Mostrador"
                 placeholderTextColor={colors.muted}
                 value={customerName}
                 onChangeText={setCustomerName}
+                onFocus={() => setFocusedInput('customerName')}
+                onBlur={() => setFocusedInput(null)}
               />
             </>
           )}
 
-          <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Productos Seleccionados</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 10 }]}>
+            Productos Seleccionados
+          </Text>
 
           <View style={styles.orderItemList}>
             {selectedItems.length === 0 ? (
@@ -328,25 +407,35 @@ export function CreateOrderView() {
                 <View key={item.productId} style={styles.orderItemRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.summaryName}>{item.name}</Text>
-                    <Text style={styles.summarySub}>${item.price.toFixed(2)} c/u</Text>
+                    <Text style={styles.summarySub}>
+                      ${item.price.toFixed(2)} c/u
+                    </Text>
                   </View>
                   <View style={styles.quantityControls}>
-                    <TouchableOpacity
-                      style={styles.qtyBtn}
+                    <Pressable
                       onPress={() => handleRemoveProduct(item.productId)}
+                      style={({ pressed }) => [
+                        styles.qtyBtn,
+                        pressed && styles.qtyBtnPressed,
+                      ]}
                     >
                       <Text style={styles.qtyBtnText}>-</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                     <Text style={styles.qtyText}>{item.quantity}</Text>
-                    <TouchableOpacity
-                      style={styles.qtyBtn}
+                    <Pressable
                       onPress={() => {
-                        const productRef = products.find((p) => p.id === item.productId);
+                        const productRef = products.find(
+                          (p) => p.id === item.productId,
+                        );
                         if (productRef) handleAddProduct(productRef);
                       }}
+                      style={({ pressed }) => [
+                        styles.qtyBtn,
+                        pressed && styles.qtyBtnPressed,
+                      ]}
                     >
                       <Text style={styles.qtyBtnText}>+</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
                 </View>
               ))
@@ -355,183 +444,30 @@ export function CreateOrderView() {
 
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>Total a Pagar:</Text>
-            <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>
+              ${calculateTotal().toFixed(2)}
+            </Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.submitButton, submitting && { opacity: 0.7 }]}
+          <Pressable
             onPress={handleSubmitOrder}
             disabled={submitting}
+            style={({ pressed }) => [
+              styles.submitButton,
+              pressed && styles.submitButtonPressed,
+              submitting && { opacity: 0.7 },
+            ]}
           >
             {submitting ? (
               <ActivityIndicator color={colors.surface} />
             ) : (
-              <Text style={styles.submitButtonText}>Confirmar y Crear Orden</Text>
+              <Text style={styles.submitButtonText}>
+                Confirmar y Crear Orden
+              </Text>
             )}
-          </TouchableOpacity>
+          </Pressable>
         </ScrollView>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 16, paddingTop: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 15 },
-  backButton: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold', color: colors.primary },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    color: colors.danger,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    textAlign: 'center',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-
-  // Estilos de Pestañas (Tabs)
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.border,
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 15,
-  },
-  tabButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  activeTabButton: {
-    backgroundColor: colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  activeTabText: { color: colors.surface, fontWeight: 'bold' },
-
-  sectionContainer: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: colors.primary, marginBottom: 10 },
-  sectionHint: { fontSize: 13, color: colors.muted, marginBottom: 10, fontStyle: 'italic' },
-
-  // Selector LOCAL / DOMICILIO
-  typeSelectorRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-  },
-  activeTypeButton: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  typeButtonText: { fontSize: 13, fontWeight: '600', color: colors.text },
-  activeTypeText: { color: colors.surface, fontWeight: 'bold' },
-
-  productCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  productName: { fontSize: 15, fontWeight: '600', color: colors.text },
-  productPrice: { fontSize: 14, color: colors.accent, fontWeight: '700', marginTop: 4 },
-  addIconBadge: {
-    backgroundColor: colors.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addIconText: { color: colors.surface, fontWeight: 'bold', fontSize: 18 },
-
-  label: { fontSize: 13, fontWeight: '500', color: colors.muted, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    marginBottom: 15,
-    backgroundColor: colors.background,
-    color: colors.text,
-  },
-  multilineInput: { minHeight: 68, textAlignVertical: 'top' },
-
-  orderItemList: {
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: colors.background,
-    minHeight: 120,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.muted,
-    marginTop: 30,
-    fontSize: 13,
-    paddingHorizontal: 20,
-  },
-
-  orderItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  summaryName: { fontSize: 14, fontWeight: '600', color: colors.text },
-  summarySub: { fontSize: 12, color: colors.muted, marginTop: 2 },
-
-  quantityControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qtyBtn: {
-    backgroundColor: colors.border,
-    width: 30,
-    height: 30,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qtyBtnText: { fontWeight: 'bold', color: colors.text, fontSize: 16 },
-  qtyText: { fontSize: 15, fontWeight: 'bold', color: colors.text, minWidth: 20, textAlign: 'center' },
-
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
-  },
-  totalLabel: { fontSize: 16, fontWeight: 'bold', color: colors.text },
-  totalAmount: { fontSize: 20, fontWeight: 'bold', color: colors.accent },
-
-  submitButton: {
-    backgroundColor: colors.success,
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 5,
-  },
-  submitButtonText: { color: colors.surface, fontSize: 16, fontWeight: 'bold' },
-});

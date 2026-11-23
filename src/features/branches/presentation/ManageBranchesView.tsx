@@ -1,13 +1,12 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
-  StyleSheet,
+  Pressable,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
@@ -19,9 +18,11 @@ import {
   getBranches,
   updateBranch,
 } from '../infrastructure/datasources/branches-api.datasource';
+import { styles } from './manageBranchesView.styles';
+
+type FocusedInput = 'name' | 'address' | null;
 
 export function ManageBranchesView() {
-  const router = useRouter();
   const { user } = useAuth();
 
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -38,6 +39,7 @@ export function ManageBranchesView() {
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [nameInput, setNameInput] = useState<string>('');
   const [addressInput, setAddressInput] = useState<string>('');
+  const [focusedInput, setFocusedInput] = useState<FocusedInput>(null);
 
   // Estado del Modal de Confirmación de Eliminación
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
@@ -151,35 +153,56 @@ export function ManageBranchesView() {
   if (!canManageBranches) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorBanner}>
-          Acceso denegado. Solo gerentes y administradores pueden administrar sucursales.
-        </Text>
-        <TouchableOpacity style={styles.menuButton} onPress={() => router.back()}>
-          <Text style={styles.menuButtonText}>Volver</Text>
-        </TouchableOpacity>
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>
+            Acceso denegado. Solo gerentes y administradores pueden administrar sucursales.
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Barra superior */}
+      <View style={[styles.topBar, { justifyContent: 'flex-end' }]}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>SUCURSALES</Text>
+        </View>
+      </View>
+
       {/* Encabezado */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtnWrapper}>
-          <Text style={styles.backButton}>← Volver</Text>
-        </TouchableOpacity>
         <Text style={styles.title}>Gestión de Sucursales</Text>
         <Text style={styles.subtitle}>Crear, modificar y eliminar ubicaciones</Text>
       </View>
 
       {/* Banners de Notificación */}
-      {errorMsg ? <Text style={styles.errorBanner}>{errorMsg}</Text> : null}
-      {successMsg ? <Text style={styles.successBanner}>{successMsg}</Text> : null}
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{errorMsg}</Text>
+        </View>
+      ) : null}
+
+      {successMsg ? (
+        <View style={styles.successBanner}>
+          <Text style={styles.successBannerText}>{successMsg}</Text>
+        </View>
+      ) : null}
 
       {/* Botón para Nueva Sucursal */}
-      <TouchableOpacity style={styles.createButton} onPress={handleOpenCreateModal}>
-        <Text style={styles.createButtonText}>+ Registrar Nueva Sucursal</Text>
-      </TouchableOpacity>
+      <Pressable
+        onPress={handleOpenCreateModal}
+        style={({ pressed }) => [
+          styles.createButton,
+          pressed && styles.createButtonPressed,
+        ]}
+      >
+        <View style={styles.createIconBox}>
+          <Text style={styles.createIconText}>+</Text>
+        </View>
+        <Text style={styles.createButtonText}>Registrar Nueva Sucursal</Text>
+      </Pressable>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
@@ -187,37 +210,59 @@ export function ManageBranchesView() {
         <FlatList
           data={branches}
           keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.branchName}>{item.name}</Text>
-                <View style={styles.idBadge}>
-                  <Text style={styles.idBadgeText}>ID: #{item.id}</Text>
+              <View style={styles.cardTopBar} />
+
+              <View style={styles.cardBody}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.branchName}>{item.name}</Text>
+                  <View style={styles.idBadge}>
+                    <Text style={styles.idBadgeText}>ID #{item.id}</Text>
+                  </View>
                 </View>
-              </View>
 
-              <Text style={styles.branchAddress}>📍 {item.address}</Text>
+                <Text style={styles.branchAddress}>{item.address}</Text>
 
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.editBtn}
-                  onPress={() => handleOpenEditModal(item)}
-                >
-                  <Text style={styles.editBtnText}>✏️ Modificar</Text>
-                </TouchableOpacity>
+                <View style={styles.cardActions}>
+                  <Pressable
+                    onPress={() => handleOpenEditModal(item)}
+                    style={({ pressed }) => [
+                      styles.editBtn,
+                      pressed && styles.editBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.editBtnText}>Modificar</Text>
+                  </Pressable>
 
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => confirmDeleteBranch(item)}
-                >
-                  <Text style={styles.deleteBtnText}>🗑️ Eliminar</Text>
-                </TouchableOpacity>
+                  <Pressable
+                    onPress={() => confirmDeleteBranch(item)}
+                    style={({ pressed }) => [
+                      styles.deleteBtn,
+                      pressed && styles.deleteBtnPressed,
+                    ]}
+                  >
+                    {({ pressed }) => (
+                      <Text
+                        style={[
+                          styles.deleteBtnText,
+                          pressed && styles.deleteBtnTextPressed,
+                        ]}
+                      >
+                        Eliminar
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
             </View>
           )}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No hay sucursales registradas.</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No hay sucursales registradas.</Text>
+            </View>
           }
         />
       )}
@@ -226,53 +271,73 @@ export function ManageBranchesView() {
       <Modal visible={modalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? 'Modificar Sucursal' : 'Nueva Sucursal'}
-            </Text>
-            <Text style={styles.modalSubtitle}>
-              {isEditing
-                ? 'Actualiza los datos de la sucursal'
-                : 'Ingresa los datos para registrar la sucursal'}
-            </Text>
+            <View style={styles.modalTopBar} />
 
-            <Text style={styles.label}>Nombre de la Sucursal</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej. Sucursal Centro"
-              placeholderTextColor={colors.muted}
-              value={nameInput}
-              onChangeText={setNameInput}
-            />
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>
+                {isEditing ? 'Modificar Sucursal' : 'Nueva Sucursal'}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                {isEditing
+                  ? 'Actualiza los datos de la sucursal'
+                  : 'Ingresa los datos para registrar la sucursal'}
+              </Text>
 
-            <Text style={styles.label}>Dirección</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej. Av. Principal #123"
-              placeholderTextColor={colors.muted}
-              value={addressInput}
-              onChangeText={setAddressInput}
-            />
+              <Text style={styles.label}>Nombre de la Sucursal</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedInput === 'name' && styles.inputFocused,
+                ]}
+                placeholder="Ej. Sucursal Centro"
+                placeholderTextColor={colors.muted}
+                value={nameInput}
+                onChangeText={setNameInput}
+                onFocus={() => setFocusedInput('name')}
+                onBlur={() => setFocusedInput(null)}
+              />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setModalVisible(false)}
-                disabled={actionLoading}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
+              <Text style={styles.label}>Dirección</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedInput === 'address' && styles.inputFocused,
+                ]}
+                placeholder="Ej. Av. Principal #123"
+                placeholderTextColor={colors.muted}
+                value={addressInput}
+                onChangeText={setAddressInput}
+                onFocus={() => setFocusedInput('address')}
+                onBlur={() => setFocusedInput(null)}
+              />
 
-              <TouchableOpacity
-                style={[styles.modalConfirmBtn, actionLoading && { opacity: 0.7 }]}
-                onPress={handleSaveBranch}
-                disabled={actionLoading}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator color={colors.surface} size="small" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>Guardar</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setModalVisible(false)}
+                  disabled={actionLoading}
+                  style={({ pressed }) => [
+                    styles.modalCancelBtn,
+                    pressed && styles.modalCancelBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSaveBranch}
+                  disabled={actionLoading}
+                  style={[
+                    styles.modalConfirmBtn,
+                    actionLoading && { opacity: 0.7 },
+                  ]}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color={colors.surface} size="small" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>Guardar</Text>
+                  )}
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -282,31 +347,41 @@ export function ManageBranchesView() {
       <Modal visible={deleteModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Eliminar Sucursal</Text>
-            <Text style={styles.modalSubtitle}>
-              ¿Estás seguro de que deseas eliminar la sucursal &quot;{branchToDelete?.name}&quot;? Esta acción no se puede deshacer.
-            </Text>
+            <View style={[styles.modalTopBar, { backgroundColor: colors.danger }]} />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setDeleteModalVisible(false)}
-                disabled={actionLoading}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>Eliminar Sucursal</Text>
+              <Text style={styles.modalSubtitle}>
+                ¿Estás seguro de que deseas eliminar la sucursal &quot;{branchToDelete?.name}&quot;? Esta acción no se puede deshacer.
+              </Text>
 
-              <TouchableOpacity
-                style={[styles.modalDeleteBtn, actionLoading && { opacity: 0.7 }]}
-                onPress={handleDeleteBranch}
-                disabled={actionLoading}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator color={colors.surface} size="small" />
-                ) : (
-                  <Text style={styles.modalDeleteText}>Sí, Eliminar</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setDeleteModalVisible(false)}
+                  disabled={actionLoading}
+                  style={({ pressed }) => [
+                    styles.modalCancelBtn,
+                    pressed && styles.modalCancelBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleDeleteBranch}
+                  disabled={actionLoading}
+                  style={[
+                    styles.modalDeleteBtn,
+                    actionLoading && { opacity: 0.7 },
+                  ]}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color={colors.surface} size="small" />
+                  ) : (
+                    <Text style={styles.modalDeleteText}>Sí, Eliminar</Text>
+                  )}
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -314,262 +389,3 @@ export function ManageBranchesView() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    paddingTop: 45,
-    backgroundColor: colors.background,
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  backBtnWrapper: {
-    position: 'absolute',
-    left: 0,
-    top: 2,
-  },
-  backButton: {
-    fontSize: 15,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    color: colors.danger,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  successBanner: {
-    backgroundColor: '#D1FAE5',
-    color: colors.success,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  createButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  createButtonText: {
-    color: colors.surface,
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  branchName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-    flex: 1,
-  },
-  idBadge: {
-    backgroundColor: colors.beige,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  idBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  branchAddress: {
-    fontSize: 13,
-    color: colors.muted,
-    marginBottom: 12,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 10,
-  },
-  editBtn: {
-    flex: 1,
-    backgroundColor: colors.background,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  editBtnText: {
-    color: colors.primary,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  deleteBtn: {
-    flex: 1,
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  deleteBtnText: {
-    color: colors.danger,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.muted,
-    marginTop: 40,
-    fontSize: 14,
-  },
-  menuButton: {
-    backgroundColor: colors.secondary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  menuButtonText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(43, 33, 30, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    color: colors.muted,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.muted,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    marginBottom: 14,
-    backgroundColor: colors.background,
-    color: colors.text,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 6,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    backgroundColor: colors.border,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: colors.text,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalConfirmBtn: {
-    flex: 1,
-    backgroundColor: colors.success,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalDeleteBtn: {
-    flex: 1,
-    backgroundColor: colors.danger,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalDeleteText: {
-    color: colors.surface,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});

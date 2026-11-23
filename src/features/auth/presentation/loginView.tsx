@@ -1,10 +1,11 @@
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { ComponentRef, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -13,14 +14,19 @@ import {
 import { PrimaryButton } from '../../../shared/components/PrimaryButton';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from './context/AuthContext';
+import { styles } from './loginView.styles';
+
+type FocusedField = 'email' | 'password' | null;
 
 export function LoginView() {
   const router = useRouter();
   const { signIn } = useAuth();
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState<FocusedField>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,98 +64,175 @@ export function LoginView() {
     }
   }
 
+  const isEmailFocused = focusedField === 'email';
+  const isPasswordFocused = focusedField === 'password';
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboard}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        ref={scrollRef}
+        contentContainerStyle={[styles.scroll, { flexGrow: 1, paddingBottom: 32 }]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
+          <View style={styles.topBadgeRow}>
+            <View style={styles.badge}>
+              <Feather name="shield" size={12} color={colors.secondary} />
+              <Text style={styles.badgeText}>PORTAL OPERATIVO</Text>
+            </View>
+          </View>
+
           <View style={styles.brandRow}>
             <View style={styles.logo}>
               <Text style={styles.logoText}>S</Text>
             </View>
 
-            <View>
+            <View style={styles.brandTextGroup}>
               <Text style={styles.brand}>SLICE MANAGER</Text>
               <Text style={styles.subtitle}>
-                Administración de pizzería
+                Administración de pizzería y sucursales
               </Text>
             </View>
           </View>
 
           <View style={styles.card}>
-            <View style={styles.accent} />
+            <View style={styles.cardTopBar} />
 
-            <Text style={styles.title}>¡Bienvenido!</Text>
-            <Text style={styles.description}>
-              Inicia sesión para continuar.
-            </Text>
-
-            <Text style={styles.label}>
-              Correo electrónico
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.icon}>@</Text>
-
-              <TextInput
-                style={styles.input}
-                placeholder="usuario@ejemplo.com"
-                placeholderTextColor={colors.muted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-              />
-            </View>
-
-            <Text style={styles.label}>Contraseña</Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.icon}>●</Text>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Escribe tu contraseña"
-                placeholderTextColor={colors.muted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                returnKeyType="go"
-                onSubmitEditing={handleLogin}
-              />
-
-              <Text
-                style={styles.showPassword}
-                onPress={() =>
-                  setShowPassword(!showPassword)
-                }
-              >
-                {showPassword ? 'Ocultar' : 'Mostrar'}
+            <View style={styles.cardBody}>
+              <Text style={styles.kicker}>Acceso al sistema</Text>
+              <Text style={styles.title}>¡Bienvenido!</Text>
+              <Text style={styles.description}>
+                Inicia sesión con tu cuenta para gestionar pedidos, caja y entregas.
               </Text>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Correo electrónico</Text>
+
+                <View
+                  style={[
+                    styles.inputContainer,
+                    isEmailFocused && styles.inputContainerFocused,
+                    error ? styles.inputContainerError : null,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.iconBox,
+                      isEmailFocused && styles.iconBoxFocused,
+                    ]}
+                  >
+                    <Feather
+                      name="mail"
+                      size={15}
+                      color={isEmailFocused ? colors.primary : colors.muted}
+                    />
+                  </View>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="usuario@ejemplo.com"
+                    placeholderTextColor={colors.muted}
+                    value={email}
+                    onChangeText={setEmail}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Contraseña</Text>
+
+                <View
+                  style={[
+                    styles.inputContainer,
+                    isPasswordFocused && styles.inputContainerFocused,
+                    error ? styles.inputContainerError : null,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.iconBox,
+                      isPasswordFocused && styles.iconBoxFocused,
+                    ]}
+                  >
+                    <Feather
+                      name="lock"
+                      size={15}
+                      color={isPasswordFocused ? colors.primary : colors.muted}
+                    />
+                  </View>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Escribe tu contraseña"
+                    placeholderTextColor={colors.muted}
+                    value={password}
+                    onChangeText={setPassword}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
+                  />
+
+                  <Pressable
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    accessibilityLabel={
+                      showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                    }
+                    style={({ pressed }) => [
+                      styles.toggleButton,
+                      pressed && styles.toggleButtonPressed,
+                    ]}
+                  >
+                    <Feather
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={16}
+                      color={colors.secondary}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Feather
+                    name="alert-circle"
+                    size={16}
+                    color={colors.danger}
+                  />
+                  <Text style={styles.error}>{error}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.buttonWrapper}>
+                <PrimaryButton
+                  title="INICIAR SESIÓN"
+                  onPress={handleLogin}
+                  loading={loading}
+                  disabled={loading}
+                />
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.securityRow}>
+                <View style={styles.securityDot} />
+                <Text style={styles.security}>
+                  Acceso exclusivo para personal autorizado
+                </Text>
+              </View>
             </View>
-
-            {error ? (
-              <Text style={styles.error}>{error}</Text>
-            ) : null}
-
-            <PrimaryButton
-              title="INICIAR SESIÓN"
-              onPress={handleLogin}
-              loading={loading}
-              disabled={loading}
-            />
-
-            <Text style={styles.security}>
-              Acceso exclusivo para personal autorizado
-            </Text>
           </View>
 
           <Text style={styles.footer}>
@@ -160,141 +243,3 @@ export function LoginView() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboard: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 32,
-    backgroundColor: colors.background,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    marginBottom: 25,
-  },
-  logo: {
-    width: 58,
-    height: 58,
-    borderRadius: 17,
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    color: colors.gold,
-    fontSize: 31,
-    fontWeight: '900',
-  },
-  brand: {
-    color: colors.primary,
-    fontSize: 21,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  subtitle: {
-    color: colors.secondary,
-    fontSize: 13,
-    marginTop: 3,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 24,
-    elevation: 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-  },
-  accent: {
-    width: 42,
-    height: 5,
-    borderRadius: 10,
-    backgroundColor: colors.accent,
-    marginBottom: 17,
-  },
-  title: {
-    color: colors.primary,
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  description: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 7,
-    marginBottom: 24,
-  },
-  label: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  inputContainer: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 13,
-    paddingHorizontal: 12,
-    marginBottom: 17,
-  },
-  icon: {
-    width: 27,
-    color: colors.secondary,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  input: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 14,
-    paddingVertical: 14,
-  },
-  showPassword: {
-    color: colors.secondary,
-    fontSize: 11,
-    fontWeight: '700',
-    paddingLeft: 5,
-  },
-  error: {
-    color: colors.danger,
-    fontSize: 13,
-    marginBottom: 14,
-    lineHeight: 18,
-  },
-  security: {
-    color: colors.muted,
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 17,
-    lineHeight: 16,
-  },
-  footer: {
-    textAlign: 'center',
-    color: colors.secondary,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginTop: 22,
-  },
-});
