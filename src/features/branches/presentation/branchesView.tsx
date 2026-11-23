@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,54 +10,52 @@ import {
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from '../../auth/presentation/context/AuthContext';
-
-interface BranchModel {
-  id: number;
-  name: string;
-  address: string;
-  createdAt?: string;
-}
-
-const API_URL = 'http://localhost:3000'; // Ajusta si tu backend usa otra URL
+import { Branch } from '../domain/entities';
+import { getBranchById, getBranches } from '../infrastructure/datasources/branches-api.datasource';
 
 export function BranchesView() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [branch, setBranch] = useState<BranchModel | null>(null);
+  const [branch, setBranch] = useState<Branch | null>(null);
+  const [branchesCount, setBranchesCount] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  const isManager = user?.role === 'GERENTE';
+  const canManageBranches = ['ADMIN_GENERAL', 'GERENTE'].includes(user?.role || '');
 
-  useEffect(() => {
-    const loadBranchData = async () => {
-      try {
-        setLoading(true);
-        setErrorMsg('');
+  const loadBranchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setErrorMsg('');
 
-        if (!user?.branchId) {
-          setErrorMsg('No hay sucursal asociada a este usuario.');
-          setLoading(false);
-          return;
-        }
-
-        const token = await AsyncStorage.getItem('@kame_token');
-        const response = await axios.get<BranchModel>(
-          `${API_URL}/branches/${user.branchId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        setBranch(response.data);
-      } catch (error: any) {
-        setErrorMsg(error.response?.data?.message || 'No se pudo cargar la información de la sucursal.');
-      } finally {
-        setLoading(false);
+      if (canManageBranches) {
+        const allBranches = await getBranches();
+        setBranchesCount(allBranches.length);
       }
-    };
 
-    loadBranchData();
-  }, [user]);
+      if (user?.branchId) {
+        const branchData = await getBranchById(user.branchId);
+        setBranch(branchData);
+      } else if (user?.role === 'ADMIN_GENERAL') {
+        setBranch(null);
+      } else {
+        setErrorMsg('No hay sucursal asociada a este usuario.');
+      }
+    } catch (error: any) {
+      setErrorMsg(
+        error.message || 'No se pudo cargar la información de la sucursal.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [canManageBranches, user?.branchId, user?.role]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBranchData();
+    }, [loadBranchData]),
+  );
 
   if (loading) {
     return (
@@ -78,13 +74,15 @@ export function BranchesView() {
         <Text style={styles.subtitle}>Detalles de la ubicación asignada</Text>
       </View>
 
-      {/* Botón exclusivo para Gerentes: Gestionar Sucursales */}
-      {isManager && (
+      {/* Botón para Gerentes y Admin General: Gestionar Sucursales */}
+      {canManageBranches && (
         <TouchableOpacity
           style={styles.manageBranchesButton}
-          onPress={() => router.push('/branches/manageBranches' as any)} // Ajusta la ruta según tu estructura de archivos
+          onPress={() => router.push('/branches/manageBranches' as any)}
         >
-          <Text style={styles.manageBranchesButtonText}>⚙️ Administrar Sucursales</Text>
+          <Text style={styles.manageBranchesButtonText}>
+            ⚙️ Administrar Sucursales {branchesCount > 0 ? `(${branchesCount})` : ''}
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -137,7 +135,11 @@ export function BranchesView() {
         </View>
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No se encontró información de la sucursal.</Text>
+          <Text style={styles.emptyText}>
+            {user?.role === 'ADMIN_GENERAL'
+              ? 'Como Administrador General puedes administrar todas las sucursales desde el botón superior.'
+              : 'No se encontró información de la sucursal.'}
+          </Text>
         </View>
       )}
 
@@ -287,6 +289,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: colors.muted,
+    textAlign: 'center',
   },
   backButtonContainer: {
     marginTop: 'auto',

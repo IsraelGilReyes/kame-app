@@ -1,5 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -13,68 +11,49 @@ import {
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from '../../auth/presentation/context/AuthContext';
-
-type CashRegisterStatus = 'OPEN' | 'CLOSED';
-
-interface CashRegisterModel {
-  id: number;
-  initialAmount: string;
-  generatedAmount: string;
-  totalAmount: string;
-  status: CashRegisterStatus;
-  openedAt: string;
-  closedAt: string | null;
-  openedBy?: { id: number; name: string; email: string };
-}
-
-const API_URL = 'http://localhost:3000';
+import { CashRegister } from '../domain/entites';
+import { getWeeklyCashRegisters } from '../infrastructure/datasources/cash-register-api.datasource';
 
 export function WeeklyCashRegistersView() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [weeklyRegisters, setWeeklyRegisters] = useState<CashRegisterModel[]>([]);
+  const [weeklyRegisters, setWeeklyRegisters] = useState<CashRegister[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [selectedRegister, setSelectedRegister] = useState<CashRegisterModel | null>(null);
+  const [selectedRegister, setSelectedRegister] = useState<CashRegister | null>(null);
 
   const branchId = user?.branchId || 1;
 
-  const loadWeeklyData = async () => {
+  const loadWeeklyData = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMsg('');
-
-      const token = await AsyncStorage.getItem('@kame_token');
-      const response = await axios.get<CashRegisterModel[]>(
-        `${API_URL}/cash-register/branch/${branchId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setWeeklyRegisters(response.data);
+      const data = await getWeeklyCashRegisters(branchId);
+      setWeeklyRegisters(data);
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || 'No se pudo cargar el historial de cajas.');
+      setErrorMsg(error.message || 'No se pudo cargar el historial de cajas.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [branchId]);
 
   useFocusEffect(
     useCallback(() => {
       loadWeeklyData();
-    }, [branchId])
+    }, [loadWeeklyData]),
   );
 
-  const handleOpenDetail = (register: CashRegisterModel) => {
+  const handleOpenDetail = (register: CashRegister) => {
     setSelectedRegister(register);
     setModalVisible(true);
   };
 
-  const renderItem = ({ item }: { item: CashRegisterModel }) => {
-    const openerName = typeof item.openedBy === 'object' ? item.openedBy?.name : 'Usuario';
-    
+  const renderItem = ({ item }: { item: CashRegister }) => {
+    const openerName = item.openedBy?.name || 'Usuario';
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -100,17 +79,23 @@ export function WeeklyCashRegistersView() {
           </View>
         </View>
 
-        <Text style={styles.dateText}>Apertura: {new Date(item.openedAt).toLocaleString()}</Text>
+        <Text style={styles.dateText}>
+          Apertura: {new Date(item.openedAt).toLocaleString()}
+        </Text>
         <Text style={styles.dateText}>Por: {openerName}</Text>
 
         <View style={styles.cardFooter}>
           <View>
             <Text style={styles.labelSub}>Recaudado en ventas:</Text>
-            <Text style={styles.generatedAmount}>${Number(item.generatedAmount || 0).toFixed(2)}</Text>
+            <Text style={styles.generatedAmount}>
+              ${Number(item.generatedAmount || 0).toFixed(2)}
+            </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={styles.labelSub}>Total Acumulado:</Text>
-            <Text style={styles.totalAmount}>${Number(item.totalAmount || 0).toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>
+              ${Number(item.totalAmount || 0).toFixed(2)}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -154,14 +139,21 @@ export function WeeklyCashRegistersView() {
           <View style={styles.modalContent}>
             {selectedRegister && (
               <>
-                <Text style={styles.modalTitle}>Detalles de Caja #{selectedRegister.id}</Text>
-                
+                <Text style={styles.modalTitle}>
+                  Detalles de Caja #{selectedRegister.id}
+                </Text>
+
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Estado:</Text>
                   <Text
                     style={[
                       styles.detailValue,
-                      { color: selectedRegister.status === 'OPEN' ? colors.success : colors.danger },
+                      {
+                        color:
+                          selectedRegister.status === 'OPEN'
+                            ? colors.success
+                            : colors.danger,
+                      },
                     ]}
                   >
                     {selectedRegister.status}
@@ -170,18 +162,24 @@ export function WeeklyCashRegistersView() {
 
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Aperturada por:</Text>
-                  <Text style={styles.detailValue}>{selectedRegister.openedBy?.name || 'N/A'}</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedRegister.openedBy?.name || 'N/A'}
+                  </Text>
                 </View>
 
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Fecha Apertura:</Text>
-                  <Text style={styles.detailValue}>{new Date(selectedRegister.openedAt).toLocaleString()}</Text>
+                  <Text style={styles.detailValue}>
+                    {new Date(selectedRegister.openedAt).toLocaleString()}
+                  </Text>
                 </View>
 
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Fecha Cierre:</Text>
                   <Text style={styles.detailValue}>
-                    {selectedRegister.closedAt ? new Date(selectedRegister.closedAt).toLocaleString() : 'Aún abierta'}
+                    {selectedRegister.closedAt
+                      ? new Date(selectedRegister.closedAt).toLocaleString()
+                      : 'Aún abierta'}
                   </Text>
                 </View>
 
@@ -189,7 +187,9 @@ export function WeeklyCashRegistersView() {
 
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Monto Inicial:</Text>
-                  <Text style={styles.detailValue}>${Number(selectedRegister.initialAmount).toFixed(2)}</Text>
+                  <Text style={styles.detailValue}>
+                    ${Number(selectedRegister.initialAmount).toFixed(2)}
+                  </Text>
                 </View>
 
                 <View style={styles.detailRow}>
@@ -201,7 +201,9 @@ export function WeeklyCashRegistersView() {
 
                 <View style={[styles.detailRow, styles.totalDetailRow]}>
                   <Text style={styles.totalDetailLabel}>Total Final:</Text>
-                  <Text style={styles.totalDetailValue}>${Number(selectedRegister.totalAmount).toFixed(2)}</Text>
+                  <Text style={styles.totalDetailValue}>
+                    ${Number(selectedRegister.totalAmount).toFixed(2)}
+                  </Text>
                 </View>
 
                 <TouchableOpacity

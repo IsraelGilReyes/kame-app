@@ -27,7 +27,7 @@ export function CashRegisterView() {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [currentRegister, setCurrentRegister] = useState<CashRegister | null>(null);
   const [initialAmountInput, setInitialAmountInput] = useState<string>('');
-  
+
   // Mensajes de retroalimentación en UI
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
@@ -38,27 +38,26 @@ export function CashRegisterView() {
   const branchId = user?.branchId || 1;
   const branchName = user?.branch?.name || 'Sucursal Principal';
 
-  // Verificar si el usuario actual es GERENTE
-  const isManager = user?.role === 'GERENTE';
+  const canViewWeeklyHistory = ['ADMIN_GENERAL', 'GERENTE'].includes(user?.role || '');
 
-  const loadCashRegisterStatus = async () => {
+  const loadCashRegisterStatus = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMsg('');
       const data = await getActiveCashRegister(branchId);
-      setCurrentRegister(data); // Si es null, mostrará el formulario de apertura
+      setCurrentRegister(data);
     } catch (error: any) {
       setErrorMsg(error.message);
       setCurrentRegister(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [branchId]);
 
   useFocusEffect(
     useCallback(() => {
       loadCashRegisterStatus();
-    }, [branchId])
+    }, [loadCashRegisterStatus]),
   );
 
   const handleOpenRegister = async () => {
@@ -134,8 +133,8 @@ export function CashRegisterView() {
         <Text style={styles.dateText}>📅 {todayDate}</Text>
       </View>
 
-      {/* 🔐 BOTÓN CONDICIONAL: Solo visible para GERENTES */}
-      {isManager && (
+      {/* Botón condicional: visible para GERENTE y ADMIN_GENERAL */}
+      {canViewWeeklyHistory && (
         <TouchableOpacity
           style={styles.weeklyHistoryBtn}
           onPress={() => router.push('/cash-register/weeklyCashRegisters' as any)}
@@ -248,7 +247,9 @@ export function CashRegisterView() {
               <View style={styles.modalSummaryBox}>
                 <View style={styles.modalRow}>
                   <Text style={styles.modalRowLabel}>Monto Inicial:</Text>
-                  <Text style={styles.modalRowValue}>${Number(currentRegister.initialAmount).toFixed(2)}</Text>
+                  <Text style={styles.modalRowValue}>
+                    ${Number(currentRegister.initialAmount).toFixed(2)}
+                  </Text>
                 </View>
                 <View style={styles.modalRow}>
                   <Text style={styles.modalRowLabel}>Recaudado Hoy:</Text>
@@ -256,9 +257,26 @@ export function CashRegisterView() {
                     +${Number(currentRegister.generatedAmount || 0).toFixed(2)}
                   </Text>
                 </View>
-                <View style={[styles.modalRow, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 8 }]}>
-                  <Text style={[styles.modalRowLabel, { fontWeight: 'bold' }]}>Total Final:</Text>
-                  <Text style={[styles.modalRowValue, { fontWeight: 'bold', color: colors.accent }]}>
+                <View
+                  style={[
+                    styles.modalRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.modalRowLabel, { fontWeight: 'bold' }]}>
+                    Total Final:
+                  </Text>
+                  <Text
+                    style={[
+                      styles.modalRowValue,
+                      { fontWeight: 'bold', color: colors.accent },
+                    ]}
+                  >
                     ${Number(currentRegister.totalAmount).toFixed(2)}
                   </Text>
                 </View>

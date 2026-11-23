@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,16 +9,22 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { Product } from '../domain/entities';
-import { createProduct, deleteProduct, getProducts, updateProduct } from '../infrastructure/datasources/products-api.datasource';
+import {
+  createProduct,
+  deleteProduct,
+  getProducts,
+  updateProduct,
+} from '../infrastructure/datasources/products-api.datasource';
 
 export function ManageProductsView() {
-  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   // Estados para el Modal (Crear / Editar)
   const [modalVisible, setModalVisible] = useState(false);
@@ -27,7 +33,7 @@ export function ManageProductsView() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
 
-  // Estados para los mensajes de error en línea (sin alertas)
+  // Estados para los mensajes de error en línea
   const [nameError, setNameError] = useState('');
   const [priceError, setPriceError] = useState('');
 
@@ -47,9 +53,11 @@ export function ManageProductsView() {
     }
   };
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts();
+    }, []),
+  );
 
   const handleOpenCreate = () => {
     setIsEditing(false);
@@ -73,16 +81,15 @@ export function ManageProductsView() {
 
   const handleSaveProduct = async () => {
     let isValid = true;
+    const trimmedName = name.trim();
 
-    // Validación de nombre
-    if (!name.trim()) {
+    if (!trimmedName) {
       setNameError('El nombre del producto es obligatorio.');
       isValid = false;
     } else {
       setNameError('');
     }
 
-    // Validación de precio
     const numericPrice = parseFloat(price);
     if (!price.trim()) {
       setPriceError('El precio es obligatorio.');
@@ -94,19 +101,22 @@ export function ManageProductsView() {
       setPriceError('');
     }
 
-    if (!isValid) return; // Detiene la ejecución si hay errores
+    if (!isValid) return;
 
     try {
+      setSaving(true);
       if (isEditing && currentId !== null) {
-        await updateProduct(currentId, { name, price: numericPrice });
+        await updateProduct(currentId, { name: trimmedName, price: numericPrice });
       } else {
-        await createProduct({ name, price: numericPrice });
+        await createProduct({ name: trimmedName, price: numericPrice });
       }
 
       setModalVisible(false);
-      loadProducts();
+      await loadProducts();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo guardar el producto');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -119,13 +129,16 @@ export function ManageProductsView() {
     if (!productToDelete) return;
 
     try {
+      setDeleting(true);
       await deleteProduct(productToDelete.id);
       setDeleteModalVisible(false);
       setProductToDelete(null);
-      loadProducts();
+      await loadProducts();
     } catch (error: any) {
       setDeleteModalVisible(false);
       Alert.alert('Error', error.message || 'No se pudo eliminar el producto');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -136,10 +149,16 @@ export function ManageProductsView() {
         <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
       </View>
       <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.editButton} onPress={() => handleOpenEdit(item)}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => handleOpenEdit(item)}
+        >
           <Text style={styles.actionText}>✏️ Editar</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={() => handleConfirmDeletePrompt(item)}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleConfirmDeletePrompt(item)}
+        >
           <Text style={styles.actionText}>🗑️ Eliminar</Text>
         </TouchableOpacity>
       </View>
@@ -206,14 +225,18 @@ export function ManageProductsView() {
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.muted }]}
                 onPress={() => setModalVisible(false)}
+                disabled={saving}
               >
                 <Text style={styles.modalBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.success }]}
                 onPress={handleSaveProduct}
+                disabled={saving}
               >
-                <Text style={styles.modalBtnText}>{isEditing ? 'Guardar' : 'Crear'}</Text>
+                <Text style={styles.modalBtnText}>
+                  {saving ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -227,21 +250,28 @@ export function ManageProductsView() {
             <Text style={styles.modalTitle}>⚠️ Confirmar Eliminación</Text>
             <Text style={styles.deleteWarningText}>
               ¿Estás seguro de que deseas eliminar el producto{' '}
-              <Text style={{ fontWeight: 'bold', color: colors.text }}>{productToDelete?.name}</Text>?
+              <Text style={{ fontWeight: 'bold', color: colors.text }}>
+                {productToDelete?.name}
+              </Text>
+              ?
             </Text>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.muted }]}
                 onPress={() => setDeleteModalVisible(false)}
+                disabled={deleting}
               >
                 <Text style={styles.modalBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.danger }]}
                 onPress={handleExecuteDelete}
+                disabled={deleting}
               >
-                <Text style={styles.modalBtnText}>Sí, Eliminar</Text>
+                <Text style={styles.modalBtnText}>
+                  {deleting ? 'Eliminando...' : 'Sí, Eliminar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -280,18 +310,64 @@ const styles = StyleSheet.create({
   productName: { fontSize: 16, fontWeight: '600', color: colors.text },
   productPrice: { fontSize: 14, color: colors.accent, fontWeight: '700', marginTop: 4 },
   cardActions: { flexDirection: 'row', gap: 8 },
-  editButton: { backgroundColor: colors.beige, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
-  deleteButton: { backgroundColor: '#FEE2E2', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  editButton: {
+    backgroundColor: colors.beige,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  deleteButton: {
+    backgroundColor: '#FEE2E2',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
   actionText: { fontSize: 12, fontWeight: '600', color: colors.text },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(43, 33, 30, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, width: '100%', maxWidth: 400, borderWidth: 1, borderColor: colors.border, elevation: 5 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: colors.primary },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(43, 33, 30, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: colors.primary,
+  },
   label: { fontSize: 14, fontWeight: '500', color: colors.muted, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 4, backgroundColor: colors.background, color: colors.text },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    marginBottom: 4,
+    backgroundColor: colors.background,
+    color: colors.text,
+  },
   inputError: { borderColor: colors.danger },
   errorText: { fontSize: 12, color: colors.danger, marginBottom: 12, fontWeight: '500' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 10 },
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   modalBtnText: { color: colors.surface, fontWeight: 'bold', fontSize: 14 },
-  deleteWarningText: { fontSize: 15, color: colors.muted, textAlign: 'center', marginBottom: 20, lineHeight: 22 },
+  deleteWarningText: {
+    fontSize: 15,
+    color: colors.muted,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
 });

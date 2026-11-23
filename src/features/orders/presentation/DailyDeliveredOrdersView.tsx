@@ -1,4 +1,6 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+// src/features/orders/presentation/DailyDeliveredOrdersView.tsx
+
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,15 +11,26 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { Order } from '../../orders/domain/entities';
 import { getOrders } from '../../orders/infrastructure/datasources/orders-api.datasource';
 
-export function DailyDeliveredOrdersView() {
-  const router = useRouter();
+const isSameLocalDay = (isoDate?: string): boolean => {
+  if (!isoDate) return false;
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return false;
 
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+};
+
+export function DailyDeliveredOrdersView() {
   const [loading, setLoading] = useState<boolean>(true);
   const [deliveredOrders, setDeliveredOrders] = useState<Order[]>([]);
 
@@ -31,15 +44,9 @@ export function DailyDeliveredOrdersView() {
       setLoading(true);
       const allOrders = await getOrders();
 
-      // Obtener la fecha actual en formato YYYY-MM-DD para comparar con createdAt
-      const todayStr = new Date().toISOString().split('T')[0];
-
-      // Filtrar estrictamente las órdenes que estén ENTREGADAS y sean creadas hoy
-      const filtered = allOrders.filter((order) => {
-        const isDelivered = order.status === 'ENTREGADO';
-        const isToday = order.createdAt ? order.createdAt.startsWith(todayStr) : false;
-        return isDelivered && isToday;
-      });
+      const filtered = allOrders.filter(
+        (order) => order.status === 'ENTREGADO' && isSameLocalDay(order.createdAt),
+      );
 
       setDeliveredOrders(filtered);
     } catch (error) {
@@ -53,7 +60,7 @@ export function DailyDeliveredOrdersView() {
   useFocusEffect(
     useCallback(() => {
       loadDailyDeliveredOrders();
-    }, [])
+    }, []),
   );
 
   // Abrir modal de detalles
@@ -61,6 +68,9 @@ export function DailyDeliveredOrdersView() {
     setSelectedOrder(order);
     setModalVisible(true);
   };
+
+  const getOrderTypeLabel = (order: Order) =>
+    order.type === 'DOMICILIO' ? '🛵 A Domicilio' : '🏪 En Local';
 
   // Renderizar tarjeta de orden entregada
   const renderItem = ({ item }: { item: Order }) => (
@@ -73,13 +83,29 @@ export function DailyDeliveredOrdersView() {
         <Text style={styles.orderId}>Orden #{item.id}</Text>
         <Text style={styles.statusBadge}>✅ ENTREGADO</Text>
       </View>
+
+      <Text style={styles.cardType}>{getOrderTypeLabel(item)}</Text>
+
       <Text style={styles.cardSubtitle}>
-        {item.branch ? `Sucursal: ${item.branch.name}` : 'Toca para ver detalles'}
+        {item.branch ? `Sucursal: ${item.branch.name}` : 'Sucursal no especificada'}
+        {item.customerName ? ` • ${item.customerName}` : ''}
       </Text>
+
+      {item.type === 'DOMICILIO' && item.address ? (
+        <Text style={styles.cardAddress} numberOfLines={1}>
+          📍 {item.address}
+        </Text>
+      ) : null}
+
       <View style={styles.cardFooter}>
         <Text style={styles.orderTotal}>Total: ${Number(item.total).toFixed(2)}</Text>
         <Text style={styles.orderDate}>
-          {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+          {item.createdAt
+            ? new Date(item.createdAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : ''}
         </Text>
       </View>
     </TouchableOpacity>
@@ -89,7 +115,9 @@ export function DailyDeliveredOrdersView() {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={{ marginTop: 10, color: colors.muted }}>Cargando órdenes del día...</Text>
+        <Text style={{ marginTop: 10, color: colors.muted }}>
+          Cargando órdenes del día...
+        </Text>
       </View>
     );
   }
@@ -110,7 +138,9 @@ export function DailyDeliveredOrdersView() {
       {/* Listado de Órdenes Entregadas */}
       {deliveredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No hay órdenes entregadas registradas el día de hoy.</Text>
+          <Text style={styles.emptyText}>
+            No hay órdenes entregadas registradas el día de hoy.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -121,25 +151,45 @@ export function DailyDeliveredOrdersView() {
         />
       )}
 
-      
       {/* Modal para ver Detalles de la Orden */}
       <Modal visible={modalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {selectedOrder && (
               <>
-                <Text style={styles.modalTitle}>Detalles de Orden #{selectedOrder.id}</Text>
+                <Text style={styles.modalTitle}>
+                  Detalles de Orden #{selectedOrder.id}
+                </Text>
                 <Text style={styles.modalSubInfo}>
-                  Fecha: {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : ''}
+                  Tipo: {getOrderTypeLabel(selectedOrder)}
+                </Text>
+                {selectedOrder.customerName ? (
+                  <Text style={styles.modalSubInfo}>
+                    Cliente: {selectedOrder.customerName}
+                  </Text>
+                ) : null}
+                {selectedOrder.type === 'DOMICILIO' && selectedOrder.address ? (
+                  <Text style={styles.modalSubInfo}>
+                    Dirección: {selectedOrder.address}
+                  </Text>
+                ) : null}
+                <Text style={styles.modalSubInfo}>
+                  Fecha:{' '}
+                  {selectedOrder.createdAt
+                    ? new Date(selectedOrder.createdAt).toLocaleString()
+                    : ''}
                 </Text>
                 <Text style={[styles.modalSubInfo, { marginBottom: 16 }]}>
-                  Estado: <Text style={{ color: colors.success, fontWeight: 'bold' }}>{selectedOrder.status}</Text>
+                  Estado:{' '}
+                  <Text style={{ color: colors.success, fontWeight: 'bold' }}>
+                    {selectedOrder.status}
+                  </Text>
                 </Text>
 
                 <Text style={styles.sectionLabel}>Productos Pedidos:</Text>
                 <ScrollView style={{ maxHeight: 200, marginBottom: 16 }}>
                   {selectedOrder.items?.map((item, index) => (
-                    <View key={index} style={styles.productRow}>
+                    <View key={item.id ?? index} style={styles.productRow}>
                       <Text style={styles.productNameText}>
                         {item.quantity}x {item.product?.name || 'Producto'}
                       </Text>
@@ -152,7 +202,9 @@ export function DailyDeliveredOrdersView() {
 
                 <View style={styles.modalTotalBox}>
                   <Text style={styles.modalTotalLabel}>Total Cobrado:</Text>
-                  <Text style={styles.modalTotalValue}>${Number(selectedOrder.total).toFixed(2)}</Text>
+                  <Text style={styles.modalTotalValue}>
+                    ${Number(selectedOrder.total).toFixed(2)}
+                  </Text>
                 </View>
 
                 <Button
@@ -242,9 +294,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.success,
   },
+  cardType: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
+    marginBottom: 2,
+  },
   cardSubtitle: {
     fontSize: 12,
     color: colors.muted,
+    marginBottom: 4,
+  },
+  cardAddress: {
+    fontSize: 12,
+    color: colors.text,
     marginBottom: 8,
   },
   cardFooter: {
@@ -274,10 +337,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
     textAlign: 'center',
-  },
-  backButtonContainer: {
-    marginTop: 'auto',
-    marginBottom: 10,
   },
   modalOverlay: {
     flex: 1,

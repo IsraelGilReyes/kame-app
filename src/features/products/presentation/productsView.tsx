@@ -1,6 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from '../../auth/presentation/context/AuthContext';
 import { Product } from '../domain/entities';
@@ -12,7 +19,7 @@ export function ProductsView() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const isGerente = user?.role === 'GERENTE';
+  const canManageProducts = ['ADMIN_GENERAL', 'GERENTE'].includes(user?.role || '');
 
   const loadProducts = async () => {
     try {
@@ -29,7 +36,7 @@ export function ProductsView() {
   useFocusEffect(
     useCallback(() => {
       loadProducts();
-    }, [])
+    }, []),
   );
 
   return (
@@ -38,7 +45,7 @@ export function ProductsView() {
         <Text style={styles.title}>Catálogo de Productos 🍕</Text>
       </View>
 
-      {isGerente && (
+      {canManageProducts && (
         <TouchableOpacity
           style={styles.manageButton}
           onPress={() => router.push('/products/manageProducts' as any)}

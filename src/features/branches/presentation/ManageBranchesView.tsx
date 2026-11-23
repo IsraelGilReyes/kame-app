@@ -1,34 +1,30 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from '../../auth/presentation/context/AuthContext';
-
-interface BranchModel {
-  id: number;
-  name: string;
-  address: string;
-  createdAt?: string;
-}
-
-const API_URL = 'http://localhost:3000'; // Ajusta si tu backend usa otra URL
+import { Branch } from '../domain/entities';
+import {
+  createBranch,
+  deleteBranch,
+  getBranches,
+  updateBranch,
+} from '../infrastructure/datasources/branches-api.datasource';
 
 export function ManageBranchesView() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const [branches, setBranches] = useState<BranchModel[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
@@ -45,35 +41,32 @@ export function ManageBranchesView() {
 
   // Estado del Modal de Confirmación de Eliminación
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
-  const [branchToDelete, setBranchToDelete] = useState<BranchModel | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
 
-  const isManager = user?.role === 'GERENTE';
+  const canManageBranches = ['ADMIN_GENERAL', 'GERENTE'].includes(user?.role || '');
 
-  const loadBranches = async () => {
+  const loadBranches = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMsg('');
-      const token = await AsyncStorage.getItem('@kame_token');
-      const response = await axios.get<BranchModel[]>(`${API_URL}/branches`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setBranches(response.data);
+      const data = await getBranches();
+      setBranches(data);
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || 'Error al cargar las sucursales.');
+      setErrorMsg(error.message || 'Error al cargar las sucursales.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      if (!isManager) {
-        setErrorMsg('Acceso restringido solo a gerentes.');
+      if (!canManageBranches) {
+        setErrorMsg('Acceso restringido a gerentes y administradores.');
         setLoading(false);
         return;
       }
       loadBranches();
-    }, [user])
+    }, [canManageBranches, loadBranches]),
   );
 
   const handleOpenCreateModal = () => {
@@ -86,7 +79,7 @@ export function ManageBranchesView() {
     setModalVisible(true);
   };
 
-  const handleOpenEditModal = (branch: BranchModel) => {
+  const handleOpenEditModal = (branch: Branch) => {
     setIsEditing(true);
     setSelectedBranchId(branch.id);
     setNameInput(branch.name);
@@ -107,37 +100,31 @@ export function ManageBranchesView() {
 
     try {
       setActionLoading(true);
-      const token = await AsyncStorage.getItem('@kame_token');
-      const headers = { Authorization: `Bearer ${token}` };
 
       if (isEditing && selectedBranchId) {
-        // Actualizar
-        await axios.put(
-          `${API_URL}/branches/${selectedBranchId}`,
-          { name: nameInput.trim(), address: addressInput.trim() },
-          { headers }
-        );
+        await updateBranch(selectedBranchId, {
+          name: nameInput.trim(),
+          address: addressInput.trim(),
+        });
         setSuccessMsg('¡Sucursal actualizada correctamente!');
       } else {
-        // Crear
-        await axios.post(
-          `${API_URL}/branches`,
-          { name: nameInput.trim(), address: addressInput.trim() },
-          { headers }
-        );
+        await createBranch({
+          name: nameInput.trim(),
+          address: addressInput.trim(),
+        });
         setSuccessMsg('¡Sucursal creada exitosamente!');
       }
 
       setModalVisible(false);
-      loadBranches();
+      await loadBranches();
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || 'Error al guardar la sucursal.');
+      setErrorMsg(error.message || 'Error al guardar la sucursal.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const confirmDeleteBranch = (branch: BranchModel) => {
+  const confirmDeleteBranch = (branch: Branch) => {
     setBranchToDelete(branch);
     setDeleteModalVisible(true);
   };
@@ -147,27 +134,26 @@ export function ManageBranchesView() {
 
     try {
       setActionLoading(true);
-      const token = await AsyncStorage.getItem('@kame_token');
-      await axios.delete(`${API_URL}/branches/${branchToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await deleteBranch(branchToDelete.id);
 
       setDeleteModalVisible(false);
       setBranchToDelete(null);
       setSuccessMsg('¡Sucursal eliminada correctamente!');
-      loadBranches();
+      await loadBranches();
     } catch (error: any) {
       setDeleteModalVisible(false);
-      setErrorMsg(error.response?.data?.message || 'No se pudo eliminar la sucursal.');
+      setErrorMsg(error.message || 'No se pudo eliminar la sucursal.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (!isManager) {
+  if (!canManageBranches) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorBanner}>Acceso denegado. Solo los gerentes pueden administrar sucursales.</Text>
+        <Text style={styles.errorBanner}>
+          Acceso denegado. Solo gerentes y administradores pueden administrar sucursales.
+        </Text>
         <TouchableOpacity style={styles.menuButton} onPress={() => router.back()}>
           <Text style={styles.menuButtonText}>Volver</Text>
         </TouchableOpacity>
@@ -244,7 +230,9 @@ export function ManageBranchesView() {
               {isEditing ? 'Modificar Sucursal' : 'Nueva Sucursal'}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {isEditing ? 'Actualiza los datos de la sucursal' : 'Ingresa los datos para registrar la sucursal'}
+              {isEditing
+                ? 'Actualiza los datos de la sucursal'
+                : 'Ingresa los datos para registrar la sucursal'}
             </Text>
 
             <Text style={styles.label}>Nombre de la Sucursal</Text>
