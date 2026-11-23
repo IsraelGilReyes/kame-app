@@ -5,10 +5,9 @@ import {
   Alert,
   FlatList,
   Modal,
-  StyleSheet,
+  Pressable,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
@@ -19,12 +18,16 @@ import {
   getProducts,
   updateProduct,
 } from '../infrastructure/datasources/products-api.datasource';
+import { styles } from './manageProductsView.styles';
+
+type FocusedInput = 'name' | 'price' | null;
 
 export function ManageProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [deleting, setDeleting] = useState<boolean>(false);
+  const [focusedInput, setFocusedInput] = useState<FocusedInput>(null);
 
   // Estados para el Modal (Crear / Editar)
   const [modalVisible, setModalVisible] = useState(false);
@@ -144,230 +147,240 @@ export function ManageProductsView() {
 
   const renderItem = ({ item }: { item: Product }) => (
     <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
-      </View>
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleOpenEdit(item)}
-        >
-          <Text style={styles.actionText}>✏️ Editar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleConfirmDeletePrompt(item)}
-        >
-          <Text style={styles.actionText}>🗑️ Eliminar</Text>
-        </TouchableOpacity>
+      <View style={styles.cardTopBar} />
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardInfo}>
+          <Text style={styles.productName}>{item.name}</Text>
+          <View style={styles.pricePill}>
+            <Text style={styles.productPrice}>
+              ${Number(item.price).toFixed(2)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.cardActions}>
+          <Pressable
+            onPress={() => handleOpenEdit(item)}
+            style={({ pressed }) => [
+              styles.editButton,
+              pressed && styles.editButtonPressed,
+            ]}
+          >
+            <Text style={styles.editButtonText}>Editar</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleConfirmDeletePrompt(item)}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              pressed && styles.deleteButtonPressed,
+            ]}
+          >
+            {({ pressed }) => (
+              <Text
+                style={[
+                  styles.deleteButtonText,
+                  pressed && styles.deleteButtonTextPressed,
+                ]}
+              >
+                Eliminar
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Administrar Productos 🍕</Text>
+      <View style={styles.topBar}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>CATÁLOGO</Text>
+        </View>
       </View>
 
-      <TouchableOpacity style={styles.addButton} onPress={handleOpenCreate}>
-        <Text style={styles.addButtonText}>+ Agregar Nuevo Producto</Text>
-      </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.title}>Administrar Productos</Text>
+        <Text style={styles.subtitle}>
+          Crea, edita precios y gestiona los productos disponibles
+        </Text>
+      </View>
+
+      <Pressable
+        onPress={handleOpenCreate}
+        style={({ pressed }) => [
+          styles.addButton,
+          pressed && styles.addButtonPressed,
+        ]}
+      >
+        <View style={styles.addIconBox}>
+          <Text style={styles.addIconText}>+</Text>
+        </View>
+        <Text style={styles.addButtonText}>Agregar Nuevo Producto</Text>
+      </Pressable>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color={colors.accent}
+          style={{ marginTop: 40 }}
+        />
       ) : (
         <FlatList
           data={products}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No hay productos registrados.</Text>
+            </View>
+          }
         />
       )}
 
       {/* Modal para Crear / Editar */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? 'Modificar Producto' : 'Crear Producto'}
-            </Text>
+      <Modal visible={modalVisible} animationType="fade" transparent={true}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => !saving && setModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalTopBar} />
 
-            <Text style={styles.label}>Nombre del Producto</Text>
-            <TextInput
-              style={[styles.input, nameError ? styles.inputError : null]}
-              placeholder="Ej. Pizza Especial"
-              placeholderTextColor={colors.muted}
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                if (text.trim()) setNameError('');
-              }}
-            />
-            {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>
+                {isEditing ? 'Modificar Producto' : 'Crear Producto'}
+              </Text>
 
-            <Text style={styles.label}>Precio ($)</Text>
-            <TextInput
-              style={[styles.input, priceError ? styles.inputError : null]}
-              placeholder="Ej. 190.00"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              value={price}
-              onChangeText={(text) => {
-                setPrice(text);
-                if (text.trim() && !isNaN(parseFloat(text))) setPriceError('');
-              }}
-            />
-            {priceError ? <Text style={styles.errorText}>{priceError}</Text> : null}
+              <Text style={styles.label}>Nombre del Producto</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedInput === 'name' && styles.inputFocused,
+                  nameError ? styles.inputError : null,
+                ]}
+                placeholder="Ej. Pizza Especial"
+                placeholderTextColor={colors.muted}
+                value={name}
+                onFocus={() => setFocusedInput('name')}
+                onBlur={() => setFocusedInput(null)}
+                onChangeText={(text) => {
+                  setName(text);
+                  if (text.trim()) setNameError('');
+                }}
+              />
+              {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.muted }]}
-                onPress={() => setModalVisible(false)}
-                disabled={saving}
-              >
-                <Text style={styles.modalBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.success }]}
-                onPress={handleSaveProduct}
-                disabled={saving}
-              >
-                <Text style={styles.modalBtnText}>
-                  {saving ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.label}>Precio ($)</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedInput === 'price' && styles.inputFocused,
+                  priceError ? styles.inputError : null,
+                ]}
+                placeholder="Ej. 190.00"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                value={price}
+                onFocus={() => setFocusedInput('price')}
+                onBlur={() => setFocusedInput(null)}
+                onChangeText={(text) => {
+                  setPrice(text);
+                  if (text.trim() && !isNaN(parseFloat(text))) setPriceError('');
+                }}
+              />
+              {priceError ? (
+                <Text style={styles.errorText}>{priceError}</Text>
+              ) : null}
+
+              <View style={styles.modalButtons}>
+                <Pressable
+                  onPress={() => setModalVisible(false)}
+                  disabled={saving}
+                  style={({ pressed }) => [
+                    styles.modalCancelBtn,
+                    pressed && styles.modalCancelBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSaveProduct}
+                  disabled={saving}
+                  style={[
+                    styles.modalConfirmBtn,
+                    saving && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text style={styles.modalBtnText}>
+                    {saving ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Modal de Confirmación para Eliminar */}
       <Modal visible={deleteModalVisible} animationType="fade" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>⚠️ Confirmar Eliminación</Text>
-            <Text style={styles.deleteWarningText}>
-              ¿Estás seguro de que deseas eliminar el producto{' '}
-              <Text style={{ fontWeight: 'bold', color: colors.text }}>
-                {productToDelete?.name}
-              </Text>
-              ?
-            </Text>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => !deleting && setDeleteModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.modalTopBar, { backgroundColor: colors.danger }]} />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.muted }]}
-                onPress={() => setDeleteModalVisible(false)}
-                disabled={deleting}
-              >
-                <Text style={styles.modalBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.danger }]}
-                onPress={handleExecuteDelete}
-                disabled={deleting}
-              >
-                <Text style={styles.modalBtnText}>
-                  {deleting ? 'Eliminando...' : 'Sí, Eliminar'}
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>Confirmar Eliminación</Text>
+              <Text style={styles.deleteWarningText}>
+                ¿Estás seguro de que deseas eliminar el producto{' '}
+                <Text style={{ fontWeight: '800', color: colors.text }}>
+                  {productToDelete?.name}
                 </Text>
-              </TouchableOpacity>
+                ?
+              </Text>
+
+              <View style={styles.modalButtons}>
+                <Pressable
+                  onPress={() => setDeleteModalVisible(false)}
+                  disabled={deleting}
+                  style={({ pressed }) => [
+                    styles.modalCancelBtn,
+                    pressed && styles.modalCancelBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleExecuteDelete}
+                  disabled={deleting}
+                  style={[
+                    styles.modalDeleteBtn,
+                    deleting && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text style={styles.modalBtnText}>
+                    {deleting ? 'Eliminando...' : 'Sí, Eliminar'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingTop: 50, backgroundColor: colors.background },
-  header: { marginBottom: 20, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
-  addButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addButtonText: { color: colors.surface, fontSize: 16, fontWeight: 'bold' },
-  listContainer: { paddingBottom: 20 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 1,
-  },
-  cardInfo: { flex: 1 },
-  productName: { fontSize: 16, fontWeight: '600', color: colors.text },
-  productPrice: { fontSize: 14, color: colors.accent, fontWeight: '700', marginTop: 4 },
-  cardActions: { flexDirection: 'row', gap: 8 },
-  editButton: {
-    backgroundColor: colors.beige,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  deleteButton: {
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  actionText: { fontSize: 12, fontWeight: '600', color: colors.text },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(43, 33, 30, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: colors.primary,
-  },
-  label: { fontSize: 14, fontWeight: '500', color: colors.muted, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    marginBottom: 4,
-    backgroundColor: colors.background,
-    color: colors.text,
-  },
-  inputError: { borderColor: colors.danger },
-  errorText: { fontSize: 12, color: colors.danger, marginBottom: 12, fontWeight: '500' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 10 },
-  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  modalBtnText: { color: colors.surface, fontWeight: 'bold', fontSize: 14 },
-  deleteWarningText: {
-    fontSize: 15,
-    color: colors.muted,
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
-  },
-});

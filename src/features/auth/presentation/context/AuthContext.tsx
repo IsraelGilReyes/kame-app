@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { apiUrl } from '../../../../shared/config/api';
 import { loginUser } from '../../infrastructure/datasources/auth-api.datasource';
 
 interface User {
@@ -7,8 +8,8 @@ interface User {
   name: string;
   email: string;
   role: string;
-  branchId?: number; // 👈 Agregado para soportar la sucursal del usuario
-  branch?: {         // 👈 Opcional, por si el backend también manda el objeto branch completo
+  branchId?: number;
+  branch?: {
     id: number;
     name: string;
     address: string;
@@ -21,6 +22,7 @@ interface AuthContextData {
   isLoading: boolean;
   signIn: (email: string, pass: string) => Promise<void>;
   signOut: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -30,7 +32,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Al abrir la app, revisamos si ya hay una sesión guardada
   useEffect(() => {
     const loadStoredSession = async () => {
       try {
@@ -51,7 +52,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loadStoredSession();
   }, []);
 
-  // Función de inicio de sesión conectada a tu backend
   const signIn = async (email: string, pass: string) => {
     const response = await loginUser({ email, password: pass });
 
@@ -62,7 +62,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(response.user);
   };
 
-  // Función para cerrar sesión
   const signOut = async () => {
     await AsyncStorage.removeItem('@kame_token');
     await AsyncStorage.removeItem('@kame_user');
@@ -70,12 +69,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   };
 
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<string> => {
+    const activeToken = token ?? (await AsyncStorage.getItem('@kame_token'));
+
+    if (!activeToken) {
+      throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.');
+    }
+
+    const res = await fetch(apiUrl('/auth/change-password'), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${activeToken}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = Array.isArray(data?.message)
+        ? data.message[0]
+        : data?.message || 'No se pudo cambiar la contraseña.';
+      throw new Error(message);
+    }
+
+    return data?.message || 'Contraseña actualizada correctamente.';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, token, isLoading, signIn, signOut, changePassword }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personalizado para consumir el contexto fácilmente en cualquier pantalla
 export const useAuth = () => useContext(AuthContext);

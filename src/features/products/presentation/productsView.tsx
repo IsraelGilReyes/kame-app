@@ -3,15 +3,15 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  StyleSheet,
+  Pressable,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { colors } from '../../../shared/theme/colors';
 import { useAuth } from '../../auth/presentation/context/AuthContext';
 import { Product } from '../domain/entities';
 import { getProducts } from '../infrastructure/datasources/products-api.datasource';
+import { styles } from './productsView.styles';
 
 export function ProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -41,32 +41,61 @@ export function ProductsView() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.topBar}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>MENÚ</Text>
+        </View>
+      </View>
+
       <View style={styles.header}>
-        <Text style={styles.title}>Catálogo de Productos 🍕</Text>
+        <Text style={styles.title}>Catálogo de Productos</Text>
+        <Text style={styles.subtitle}>
+          Consulta los productos y precios disponibles
+        </Text>
       </View>
 
       {canManageProducts && (
-        <TouchableOpacity
-          style={styles.manageButton}
+        <Pressable
           onPress={() => router.push('/products/manageProducts' as any)}
+          style={({ pressed }) => [
+            styles.manageButton,
+            pressed && styles.manageButtonPressed,
+          ]}
         >
-          <Text style={styles.manageButtonText}>⚙️ Administrar Productos</Text>
-        </TouchableOpacity>
+          <Text style={styles.manageButtonText}>Administrar Productos</Text>
+          <Text style={styles.manageArrow}>→</Text>
+        </Pressable>
       )}
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color={colors.accent}
+          style={{ marginTop: 40 }}
+        />
       ) : (
         <FlatList
           data={products}
           keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No hay productos en el catálogo.</Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <View style={styles.cardInfo}>
-                <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.productPrice}>
-                  ${Number(item.price).toFixed(2)}
-                </Text>
+              <View style={styles.cardTopBar} />
+              <View style={styles.cardBody}>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.productName}>{item.name}</Text>
+                  <View style={styles.pricePill}>
+                    <Text style={styles.productPrice}>
+                      ${Number(item.price).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
           )}
@@ -75,42 +104,3 @@ export function ProductsView() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 50 },
-  header: { marginBottom: 20, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
-  manageButton: {
-    backgroundColor: colors.secondary,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  manageButtonText: {
-    color: colors.surface,
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  card: {
-    backgroundColor: colors.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 1,
-  },
-  cardInfo: { flex: 1 },
-  productName: { fontSize: 18, fontWeight: 'bold', color: colors.text },
-  productPrice: { fontSize: 16, fontWeight: '700', color: colors.accent, marginTop: 4 },
-});
